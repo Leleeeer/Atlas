@@ -1,0 +1,16 @@
+{
+  "name": "Atlas – Assistente personale",
+  "short_name": "Atlas",
+  "description": "Assistente vocale personale con AI",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#03060D",
+  "theme_color": "#03060D",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
