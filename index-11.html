@@ -1,0 +1,3150 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Atlas</title>
+<meta name="description" content="Assistente vocale personale">
+<meta name="theme-color" content="#03060D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atlas">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Unbounded:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#03060D; --bg2:#0A1426; --particle:#CFE6FF; --red:#FF4D5E; --orange:#FF9F43;
+  --text:#E8EEF6; --muted:#7F8FA6; --line:rgba(207,230,255,.09); --panel:rgba(10,20,38,.72);
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%}
+body{position:fixed;inset:0;overflow:hidden;background:radial-gradient(120% 90% at 30% 40%,var(--bg2) 0%,var(--bg) 62%)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--particle)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+#stars{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* la nuvola occupa tutto lo schermo, dietro all'interfaccia */
+#cloudWrap{position:fixed;left:0;right:0;top:0;height:var(--app-h,100dvh);outline:none;touch-action:none;-webkit-user-select:none;user-select:none}
+#cloud{width:100%;height:100%;display:block}
+#app{position:fixed;left:0;right:0;top:0;height:var(--app-h,100dvh);display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  padding:var(--sat) var(--sar) 0 var(--sal);pointer-events:none}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 28px 4px}
+/* orologio in alto a sinistra, nome e stato del sistema in alto a destra */
+.clock{display:flex;flex-direction:column;line-height:1}
+.clock b{font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:600;font-size:22px;letter-spacing:.06em;color:var(--text)}
+.clock span{font-family:'Barlow Condensed',Manrope,sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.hud{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.brand{font-family:'Barlow Condensed',Unbounded,sans-serif;font-weight:700;font-size:22px;letter-spacing:.32em;text-transform:uppercase;margin:0 -.32em 0 0;color:var(--text)}
+.sys{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-family:'Barlow Condensed',Manrope,sans-serif;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sys li{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.sys li b{font-weight:600;color:#9FE8FF}
+.sys li i{width:6px;height:6px;border-radius:50%;background:#3fd18b;box-shadow:0 0 6px #3fd18b;flex:none}
+.sys li i.off{background:#5b6677;box-shadow:none}
+.sys li i.bad{background:var(--red);box-shadow:0 0 6px var(--red)}
+/* sottotitoli: la frase che Jarvis sta dicendo */
+#caption{position:fixed;left:50%;top:calc(var(--app-h,100dvh) * 0.48 + min(27vw, 25 * var(--app-h,100dvh) / 100) * 1.3);transform:translateX(-50%);
+  width:min(560px,calc(100% - 48px));text-align:center;font-size:16px;line-height:1.45;color:var(--text);text-shadow:0 1px 10px rgba(3,6,13,.95),0 0 2px rgba(3,6,13,.9);
+  pointer-events:none;opacity:0;transition:opacity .35s;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#caption.show{opacity:1}
+.textmode ~ #caption,#caption.hide{display:none}
+main{position:relative;min-height:0}
+
+/* conversazione: pannello "vetro" sopra la nuvola, solo dopo aver toccato la freccia */
+#chat{display:none;position:absolute;right:24px;top:8px;bottom:58px;width:min(500px,44%);pointer-events:auto;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 14px 14px;flex-direction:column;gap:14px;
+  background:rgba(3,6,13,.42);border:1px solid rgba(207,230,255,.08);border-radius:22px;
+  -webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2)}
+.textmode #chat{display:flex}
+#chat::before{content:"";margin-top:auto}
+.msg{font-size:16px;line-height:1.55;word-wrap:break-word;overflow-wrap:anywhere;animation:in .35s ease both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.user{align-self:flex-end;max-width:85%;background:rgba(127,143,166,.2);color:var(--text);padding:10px 15px;border-radius:18px 18px 4px 18px;white-space:pre-wrap}
+.msg.user.live{opacity:.55}
+.msg.ai{align-self:stretch;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:4px 14px 14px 4px;padding:13px 16px 10px;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.msg.err{border-left-color:var(--orange)}
+.msg.ai p{margin:0 0 .6em}
+.msg.ai p:last-child{margin-bottom:0}
+.msg.ai ul,.msg.ai ol{margin:.2em 0 .6em;padding-left:1.3em}
+.msg.ai li{margin:.15em 0}
+.msg.ai .h{display:block;font-weight:700;margin:.4em 0 .2em}
+.msg.ai code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:rgba(207,230,255,.08);padding:1px 5px;border-radius:4px}
+.msg.ai .pre{position:relative;margin:.5em 0 .7em}
+.msg.ai pre{margin:0;background:rgba(3,6,13,.8);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.5}
+.msg.ai pre code{background:none;padding:0;font-size:inherit}
+.actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:rgba(207,230,255,.04);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600}
+.chip:active{background:rgba(207,230,255,.12)}
+.chip svg{width:14px;height:14px}
+.chip.ok{color:var(--particle)}
+.sources{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.sources>span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+.sources a{font-size:12.5px;color:var(--particle);text-decoration:none;border:1px solid rgba(207,230,255,.14);border-radius:999px;padding:3px 10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* pannello "a lato": vetro sfocato a destra (in basso sui telefoni) */
+.side{position:fixed;right:24px;top:calc(var(--sat) + 196px);bottom:calc(var(--sab) + 150px);width:min(420px,38vw);z-index:20;display:flex;flex-direction:column;
+  background:rgba(3,6,13,.42);border:1px solid rgba(207,230,255,.1);border-radius:22px;
+  -webkit-backdrop-filter:blur(18px) saturate(1.2);backdrop-filter:blur(18px) saturate(1.2);
+  opacity:0;transform:translateX(24px);pointer-events:none;transition:opacity .3s,transform .3s}
+.side.open{opacity:1;transform:none;pointer-events:auto}
+.side-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px 18px}
+.side-head span{font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:600;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:#9FE8FF}
+.side-head .iconbtn{width:36px;height:36px}
+.side-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 18px 18px;display:flex;flex-direction:column;gap:18px}
+.side h3{margin:0 0 8px;font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:600;font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.side-text{font-size:15.5px;line-height:1.55;overflow-wrap:anywhere}
+.side-text p{margin:0 0 .6em}.side-text ul,.side-text ol{margin:.2em 0 .6em;padding-left:1.2em}
+.side-text pre{margin:.4em 0;background:rgba(3,6,13,.6);border:1px solid var(--line);border-radius:10px;padding:10px 12px;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:13.5px}
+.ef{display:grid;grid-template-columns:84px 1fr;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;color:var(--muted);font-family:'Barlow Condensed',Manrope,sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.ef input,#emBody{width:100%;padding:9px 11px;border-radius:10px;border:1px solid rgba(207,230,255,.16);background:rgba(10,20,38,.7);font-size:15px;outline:none;text-transform:none;letter-spacing:0;font-family:Manrope,sans-serif;color:var(--text)}
+#emBody{resize:vertical;line-height:1.5;min-height:150px}
+#emMsg{margin:8px 0 2px;min-height:1em}
+#emMsg.ok{color:#7bd3a4}#emMsg.bad{color:var(--red)}
+#sideEmail .actions .btn{min-height:42px}
+#memList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+#memList li{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(207,230,255,.05);border:1px solid var(--line);font-size:14.5px;line-height:1.4}
+#memList li span{flex:1}
+#memList li.new{border-color:rgba(127,214,255,.5);box-shadow:0 0 14px rgba(127,214,255,.15)}
+#memList li button{flex:none;border:0;background:none;color:var(--muted);font-size:18px;line-height:1;padding:0 2px}
+
+/* Squadra: chat stile WhatsApp, colori scuri dell'app */
+#panelTeam{padding:0;background:#070b12}
+.team{height:100%;display:grid;grid-template-columns:minmax(260px,340px) 1fr;padding:var(--sat) var(--sar) 0 var(--sal)}
+.tlist{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:#0a111c}
+.thead{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:64px;border-bottom:1px solid var(--line)}
+.thead h2{flex:1;margin:0;font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:600;font-size:22px;letter-spacing:.14em;text-transform:uppercase}
+.thead.conv{background:#0d1622}
+.chats{overflow-y:auto;flex:1}
+.chat-it{display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;border-bottom:1px solid rgba(207,230,255,.04)}
+.chat-it:hover,.chat-it.on{background:rgba(127,214,255,.07)}
+.chat-it .tx{flex:1;min-width:0}
+.chat-it b{display:block;font-size:15.5px;font-weight:600}
+.chat-it span.pv{display:block;color:var(--muted);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.chat-it .meta{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:11.5px;color:var(--muted)}
+.chat-it .un{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#3fd18b;color:#04120b;font-weight:700;font-size:11.5px;display:flex;align-items:center;justify-content:center}
+.av{width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:700;font-size:16px;color:#05080e}
+.tconv{display:flex;flex-direction:column;min-height:0;background:radial-gradient(120% 80% at 70% 0%,#0d1830 0%,#070b12 60%)}
+.tinfo{flex:1;min-width:0;display:flex;flex-direction:column}
+.tinfo b{font-size:16px}
+.tinfo span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn.tback{display:none}
+.tasks{margin:10px 14px 0;padding:10px 12px;border-radius:12px;background:rgba(123,211,164,.07);border:1px solid rgba(123,211,164,.25);max-height:30%;overflow:auto}
+.tasks h4{margin:0 0 6px;font-family:'Barlow Condensed',Manrope,sans-serif;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:#7bd3a4}
+.tasks label{display:flex;gap:8px;align-items:flex-start;font-size:14px;padding:3px 0}
+.tasks label.done span{text-decoration:line-through;color:var(--muted)}
+.tasks label em{font-style:normal;color:var(--orange);font-size:12.5px;margin-left:auto;white-space:nowrap}
+.tasks input{accent-color:#3fd18b;margin-top:3px}
+.tmsgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.tm{max-width:min(78%,560px);padding:7px 10px 5px;border-radius:10px;font-size:15px;line-height:1.45;overflow-wrap:anywhere;position:relative}
+.tm.in{align-self:flex-start;background:#1a2433;border-top-left-radius:2px}
+.tm.out{align-self:flex-end;background:#0f4f46;border-top-right-radius:2px}
+.tm.sys{align-self:center;background:rgba(255,77,94,.12);border:1px solid rgba(255,77,94,.35);font-size:13.5px}
+.tm .who{display:block;font-size:12.5px;font-weight:700;margin-bottom:2px}
+.tm .tm-t{display:block;text-align:right;font-size:11px;color:rgba(232,238,246,.55);margin-top:2px}
+.tm p{margin:0 0 .45em}.tm p:last-child{margin:0}.tm ul,.tm ol{margin:.2em 0 .4em;padding-left:1.2em}
+.tm .call{display:block;font-size:13px;color:#9FE8FF;margin-top:4px}
+.tm.typing{color:var(--muted);font-style:italic}
+.ecard{margin-top:6px;border-radius:10px;border:1px solid rgba(255,181,71,.35);background:rgba(3,6,13,.45);padding:8px 10px;font-size:14px}
+.ecard .eh{font-size:12.5px;color:var(--muted)}
+.ecard .eh b{color:var(--text)}
+.ecard .eb{white-space:pre-wrap;margin:6px 0;max-height:220px;overflow:auto}
+.ecard .chip{margin-right:6px}
+.ecard .ok{color:#7bd3a4;font-size:13px}
+.tinput{display:flex;align-items:flex-end;gap:8px;padding:10px 12px calc(10px + var(--sab));background:#0d1622;border-top:1px solid var(--line)}
+.tinput textarea{flex:1;resize:none;min-height:44px;max-height:120px;padding:11px 14px;border-radius:22px;border:0;background:#1a2433;font-size:16px;line-height:1.35;outline:none}
+.tsend{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:#2fb67c;color:#04120b;display:flex;align-items:center;justify-content:center}
+.tsend svg{width:22px;height:22px;margin-left:2px}
+.tsend[disabled]{opacity:.5}
+@media (max-width:760px){
+  .team{grid-template-columns:1fr}
+  .team .tconv{display:none}
+  .team.open-chat .tlist{display:none}
+  .team.open-chat .tconv{display:flex}
+  .iconbtn.tback{display:flex}
+  .tm{max-width:88%}
+}
+
+/* barra in basso: niente fondo nero, solo una leggera sfocatura */
+.bar{position:relative;isolation:isolate;display:flex;align-items:center;gap:10px;padding:14px 24px calc(14px + var(--sab));pointer-events:none}
+.bar>*{pointer-events:auto}
+.bar::before{content:"";position:absolute;left:0;right:0;top:-46px;bottom:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(to top,rgba(3,6,13,.5),rgba(3,6,13,0));
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  -webkit-mask-image:linear-gradient(to top,#000 45%,transparent);mask-image:linear-gradient(to top,#000 45%,transparent)}
+.counters{position:absolute;right:28px;bottom:calc(100% + 4px);display:flex;gap:26px;pointer-events:none}
+.counter{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
+.counter b{font-family:'Barlow Condensed',Manrope,sans-serif;font-weight:700;font-size:38px;letter-spacing:.01em;color:var(--text);text-shadow:0 1px 10px rgba(3,6,13,.9)}
+.counter.gold b{color:#FFB547;text-shadow:0 0 14px rgba(255,181,71,.35)}
+.counter span{font-family:'Barlow Condensed',Manrope,sans-serif;font-size:10.5px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px;text-shadow:0 1px 6px rgba(3,6,13,.9)}
+.navbtn{position:relative;display:inline-flex;align-items:center;gap:9px;height:48px;padding:0 18px;border-radius:14px;border:1px solid rgba(207,230,255,.12);
+  background:rgba(10,20,38,.38);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-weight:600;font-size:15px;color:var(--text)}
+.navbtn:active{background:rgba(207,230,255,.12)}
+.navbtn svg{width:22px;height:22px;flex:none}
+.badge{position:absolute;top:-6px;left:28px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}
+.badge[hidden]{display:none}
+.composer{flex:1;min-width:0;display:flex;align-items:center;opacity:0;pointer-events:none;transform:translateX(12px);transition:opacity .2s,transform .2s}
+.composer.open{opacity:1;pointer-events:auto;transform:none}
+.composer textarea{width:100%;resize:none;overflow:hidden;min-height:48px;max-height:132px;padding:12px 16px;border-radius:14px;border:1px solid rgba(207,230,255,.18);background:rgba(10,20,38,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:16px;line-height:1.4;outline:none}
+.composer textarea:focus{border-color:rgba(207,230,255,.4)}
+.sendbtn{flex:none;width:56px;height:56px;border:0;background:none;padding:0;display:flex;align-items:center;justify-content:center;color:var(--particle);filter:drop-shadow(0 0 8px rgba(207,230,255,.35))}
+.sendbtn:active{transform:scale(.92)}
+.sendbtn svg{width:34px;height:34px}
+
+/* pannelli a schermo intero */
+.panel{position:fixed;inset:0;z-index:50;background:rgba(3,6,13,.97);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;flex-direction:column;
+  padding:var(--sat) var(--sar) 0 var(--sal);opacity:0;pointer-events:none;transition:opacity .22s}
+.panel.open{opacity:1;pointer-events:auto}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--line)}
+.panel-head h2{margin:0;font-family:Unbounded,sans-serif;font-weight:400;font-size:18px;letter-spacing:.06em}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(207,230,255,.04);display:flex;align-items:center;justify-content:center}
+.iconbtn svg{width:20px;height:20px}
+.panel-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:22px 24px calc(30px + var(--sab))}
+.panel-inner{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.hint{color:var(--muted);font-size:14.5px;line-height:1.55;margin:0}
+.notice{border:1px solid rgba(255,159,67,.35);background:rgba(255,159,67,.07);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5}
+.notice b{color:var(--orange)}
+.notice.red{border-color:rgba(255,77,94,.45);background:rgba(255,77,94,.08)}
+.notice.red b{color:var(--red)}
+.notice[hidden]{display:none}
+.field{display:flex;flex-direction:column;gap:7px}
+.field>label,.field>.lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.field input[type=text],.field input[type=password],.field select,.field textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(207,230,255,.16);background:rgba(10,20,38,.85);font-size:16px;outline:none}
+.field textarea{min-height:110px;resize:vertical;line-height:1.45}
+.field select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%237F8FA6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px}
+.row{display:flex;gap:8px;align-items:stretch}
+.row>:first-child{flex:1;min-width:0}
+.btn{border:1px solid rgba(207,230,255,.2);background:rgba(207,230,255,.06);border-radius:12px;padding:0 16px;min-height:46px;font-weight:600;font-size:15px;white-space:nowrap}
+.btn:active{background:rgba(207,230,255,.14)}
+.btn.primary{background:var(--particle);color:#03060D;border-color:var(--particle)}
+.btn.danger{color:var(--red);border-color:rgba(255,77,94,.4);background:rgba(255,77,94,.06)}
+.btn[disabled]{opacity:.5}
+.small{font-size:13px;color:var(--muted);line-height:1.45}
+.small a{color:var(--particle)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(10,20,38,.5);font-size:15.5px}
+.switch{position:relative;width:50px;height:30px;flex:none}
+.switch input{opacity:0;width:100%;height:100%;margin:0;position:absolute;inset:0;z-index:1;cursor:pointer}
+.switch i{position:absolute;inset:0;border-radius:15px;background:rgba(127,143,166,.35);transition:background .2s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch input:checked+i{background:#3b8f6a}
+.switch input:checked+i::after{transform:translateX(20px)}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.btns .btn{flex:1}
+.savedmsg{color:#7bd3a4;font-size:14px;min-height:1em}
+.sliders{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.sliders label{display:grid;grid-template-columns:90px 1fr 44px;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.sliders input{width:100%;accent-color:#7FD6FF}
+.sliders output{font-variant-numeric:tabular-nums;color:var(--text);text-align:right}
+.checkout{display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.45}
+.checkout:empty{display:none}
+.checkout .r{display:flex;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(10,20,38,.6)}
+.checkout .r b{font-weight:600;word-break:break-all}
+.checkout .ok{color:#7bd3a4}
+.checkout .no{color:var(--red)}
+.checkout .sum{padding:10px 12px;border-radius:10px;border:1px solid rgba(207,230,255,.25);background:rgba(207,230,255,.06)}
+
+.addbtn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:54px;border-radius:14px;border:1px dashed rgba(207,230,255,.35);background:rgba(207,230,255,.05);font-weight:600;font-size:16px;cursor:pointer}
+.addbtn svg{width:22px;height:22px}
+.addbtn input{display:none}
+.doclist{display:flex;flex-direction:column;gap:8px}
+.doc{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(10,20,38,.6)}
+.doc.off{opacity:.55}
+.doc .info{flex:1;min-width:0}
+.doc .name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc .meta{font-size:12.5px;color:var(--muted);margin-top:2px}
+.doc label.use{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;flex:none}
+.doc label.use input{width:22px;height:22px;accent-color:var(--red);margin:0}
+.doc .del{width:40px;height:40px;border-radius:10px;border:1px solid rgba(255,77,94,.3);background:transparent;color:var(--red);display:flex;align-items:center;justify-content:center;flex:none}
+.doc .del svg{width:18px;height:18px}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:16px}
+.busy{color:var(--particle);font-size:14px}
+
+#toast{position:fixed;left:50%;bottom:calc(96px + var(--sab));transform:translate(-50%,20px);max-width:min(520px,calc(100% - 32px));z-index:80;
+  background:rgba(10,20,38,.96);border:1px solid rgba(255,159,67,.5);border-radius:14px;padding:12px 16px;font-size:14.5px;line-height:1.45;
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* iPad verticale e schermi stretti: conversazione nella metà bassa */
+@media (orientation:portrait),(max-width:760px){
+  .side{left:16px;right:16px;width:auto;top:44%;bottom:calc(var(--sab) + 130px);transform:translateY(24px)}
+  #chat{left:16px;right:16px;width:auto;top:30%;bottom:56px}
+}
+/* iPhone: barra solo icone */
+@media (max-width:600px){
+  header{padding:12px 18px 0}
+  .brand{font-size:18px}
+  .sys{font-size:10px}
+  .sys li.opt{display:none}
+  .clock b{font-size:19px}
+  #caption{font-size:15px}
+  .navbtn{padding:0;width:48px;justify-content:center}
+  .navbtn .lbl{display:none}
+  .badge{left:auto;right:-5px}
+  .bar{padding:10px 14px calc(10px + var(--sab));gap:8px}
+  .counters{right:16px;gap:14px}
+  .counter b{font-size:24px}
+  .counter span{font-size:8px;letter-spacing:.1em}
+  #chat{left:10px;right:10px;top:26%;bottom:50px;padding:10px}
+  .msg{font-size:15.5px}
+  .panel-head{padding:12px 16px}
+  .panel-body{padding:18px 16px calc(28px + var(--sab))}
+}
+@media (prefers-reduced-motion:reduce){
+  .msg{animation:none}
+  .panel,.composer,#toast{transition:none}
+}
+</style>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+
+<div id="cloudWrap" role="button" tabindex="0" aria-label="Parla con l'assistente">
+  <canvas id="cloud" aria-hidden="true"></canvas>
+</div>
+
+<div id="app">
+  <header>
+    <div class="clock"><b id="clockTime">--:--</b><span id="clockDate"></span></div>
+    <div class="hud">
+      <h1 class="brand" id="brand">Atlas</h1>
+      <ul class="sys" id="sysList"></ul>
+    </div>
+  </header>
+  <main>
+    <section id="chat" aria-live="polite" aria-label="Conversazione"></section>
+  </main>
+  <nav class="bar">
+    <div class="counters">
+      <div class="counter"><b id="cQ">0</b><span>domande oggi</span></div>
+      <div class="counter"><b id="cT">0</b><span>domande totali</span></div>
+      <div class="counter gold"><b id="cD">0</b><span>documenti</span></div>
+      <div class="counter"><b id="cS">0</b><span>fonti web</span></div>
+    </div>
+    <button class="navbtn" id="btnDocs" aria-label="Documenti">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2.2h7.4A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>
+      <span class="lbl">Documenti</span>
+      <span class="badge" id="docBadge" hidden>0</span>
+    </button>
+    <button class="navbtn" id="btnTeam" aria-label="Squadra">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1.4-4.4A8.5 8.5 0 1 1 20.5 11.5z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" stroke-width="2.4"/></svg>
+      <span class="lbl">Squadra</span>
+      <span class="badge" id="teamBadge" hidden>0</span>
+    </button>
+    <button class="navbtn" id="btnSettings" aria-label="Impostazioni">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="lbl">Impostazioni</span>
+    </button>
+    <div class="composer" id="composer">
+      <textarea id="input" rows="1" enterkeyhint="send" placeholder="Scrivi la domanda…" aria-label="Domanda" tabindex="-1"></textarea>
+    </div>
+    <button class="sendbtn" id="btnSend" aria-label="Scrivi o invia la domanda">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5L15.5 12L9 18.5"/></svg>
+    </button>
+  </nav>
+</div>
+
+<div id="caption" aria-hidden="true"></div>
+<aside id="side" class="side" aria-label="Pannello a lato" aria-hidden="true">
+  <div class="side-head">
+    <span>A lato</span>
+    <button class="iconbtn" id="sideClose" aria-label="Chiudi il pannello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="side-body">
+    <section id="sideEmail" hidden>
+      <h3>Email da inviare</h3>
+      <label class="ef">A <input type="email" id="emTo" autocomplete="off" spellcheck="false"></label>
+      <label class="ef">Oggetto <input type="text" id="emSubject" autocomplete="off"></label>
+      <textarea id="emBody" rows="9"></textarea>
+      <div class="small" id="emMsg"></div>
+      <div class="actions">
+        <button class="btn primary" id="emSend">Invia</button>
+        <button class="btn" id="emCancel">Annulla</button>
+      </div>
+    </section>
+    <section id="sideNote" hidden>
+      <h3 id="sideTitle"></h3>
+      <div class="side-text" id="sideText"></div>
+      <div class="actions"><button class="chip" id="sideCopy">Copia</button></div>
+    </section>
+    <section id="sideMem" hidden>
+      <h3>Da ricordare</h3>
+      <ul id="memList"></ul>
+    </section>
+  </div>
+</aside>
+<div id="srStatus" class="sr-only" role="status" aria-live="polite">In attesa</div>
+<div id="toast" role="alert"></div>
+
+<!-- Pannello Squadra (chat stile WhatsApp con gli agenti) -->
+<div class="panel" id="panelTeam" aria-hidden="true" role="dialog" aria-label="Squadra">
+  <div class="team" id="team">
+    <aside class="tlist">
+      <div class="thead">
+        <h2>Squadra</h2>
+        <button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="chats" id="teamChats"></div>
+    </aside>
+    <section class="tconv">
+      <div class="thead conv">
+        <button class="iconbtn tback" id="teamBack" aria-label="Indietro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5L8.5 12L15 18.5"/></svg></button>
+        <span class="av" id="convAv"></span>
+        <div class="tinfo"><b id="convName"></b><span id="convSub"></span></div>
+      </div>
+      <div class="tasks" id="teamTasks" hidden></div>
+      <div class="tmsgs" id="teamMsgs"></div>
+      <div class="tinput">
+        <textarea id="teamInput" rows="1" placeholder="Scrivi un messaggio" enterkeyhint="send"></textarea>
+        <button class="tsend" id="teamSend" aria-label="Invia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5L15.5 12L9 18.5"/></svg></button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Pannello Documenti -->
+<div class="panel" id="panelDocs" aria-hidden="true" role="dialog" aria-label="Documenti">
+  <div class="panel-head">
+    <h2>Documenti</h2>
+    <button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body"><div class="panel-inner">
+    <p class="hint">Carica bilanci, fatture, listini o qualsiasi documento della tua attività. I documenti con la spunta <b>in uso</b> vengono inviati insieme a ogni domanda, così l'assistente può rispondere sui tuoi dati. Restano salvati solo su questo dispositivo.</p>
+    <div class="notice"><b>Privacy.</b> Con il piano gratuito di Google AI Studio, Google può usare i contenuti inviati per migliorare i suoi prodotti. Per dati riservati togli nomi, IBAN e codici fiscali prima di caricarli, oppure passa al piano a pagamento.</div>
+    <label class="addbtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Aggiungi documenti
+      <input type="file" id="fileInput" multiple accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,.md,.json,image/*,application/pdf">
+    </label>
+    <p class="small">Formati: PDF, foto, Excel (.xlsx, .xls), Word (.docx), CSV, TXT, MD, JSON. Massimo 15 MB per file.</p>
+    <div class="busy" id="docBusy" hidden></div>
+    <div class="notice red" id="docWarn" hidden></div>
+    <div class="doclist" id="docList"></div>
+  </div></div>
+</div>
+
+<!-- Pannello Impostazioni -->
+<div class="panel" id="panelSettings" aria-hidden="true" role="dialog" aria-label="Impostazioni">
+  <div class="panel-head">
+    <h2>Impostazioni</h2>
+    <button class="iconbtn" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-body"><div class="panel-inner">
+    <div class="field">
+      <label for="sName">Nome dell'assistente</label>
+      <input type="text" id="sName" maxlength="24" autocomplete="off">
+      <div class="small">È anche la parola per chiamarlo: per esempio scrivi "Jarvis" e poi di' «Jarvis, …» seguito dalla domanda.</div>
+    </div>
+    <div class="field">
+      <label for="sClaudeKey">Chiave API Claude (motore principale)</label>
+      <input type="password" id="sClaudeKey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…">
+      <div class="small">La crei su <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (servizio a pagamento, con ricarica prepagata). Resta salvata solo su questo dispositivo.</div>
+    </div>
+    <div class="field">
+      <label for="sClaudeModel">Modello Claude</label>
+      <select id="sClaudeModel">
+        <option value="claude-haiku-5-5">Haiku 5.5 · veloce ed economico</option>
+        <option value="claude-sonnet-5-5">Sonnet 5.5 · più preciso</option>
+        <option value="claude-opus-5-5">Opus 5.5 · il più bravo, più lento</option>
+      </select>
+      <div class="small" id="spendMsg"></div>
+    </div>
+    <div class="field">
+      <label for="sKey">Riserva gratuita: chiave Google AI Studio</label>
+      <input type="password" id="sKey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
+      <div class="small">Facoltativa. Si usa solo se Claude non risponde (credito finito, problemi di rete). La crei gratis su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</div>
+    </div>
+    <div class="field">
+      <label for="sModel">Modello di riserva</label>
+      <div class="row">
+        <select id="sModel"></select>
+        <button class="btn" id="btnModels">Carica elenco</button>
+      </div>
+      <div class="small" id="modelMsg"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Controllo</span>
+      <div><button class="btn" id="btnCheck">Verifica chiave e modelli</button></div>
+      <div class="small">Prova Claude e la riserva con una domanda brevissima e ti dice se funzionano. Costa una frazione di centesimo.</div>
+      <div class="checkout" id="checkOut" aria-live="polite"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Invio email (EmailJS)</span>
+      <div class="small">Per far mandare le email a Jarvis dal tuo Gmail. Prima di ogni invio ti chiede sempre conferma. I passaggi sono nella guida.</div>
+      <label class="ef">Service <input type="text" id="sEjService" placeholder="service_…" autocomplete="off" spellcheck="false"></label>
+      <label class="ef">Template <input type="text" id="sEjTemplate" placeholder="template_…" autocomplete="off" spellcheck="false"></label>
+      <label class="ef">Public key <input type="text" id="sEjKey" autocomplete="off" spellcheck="false"></label>
+      <label class="ef">Tua email <input type="email" id="sMyEmail" placeholder="tuonome@gmail.com" autocomplete="off" spellcheck="false"></label>
+      <div><button class="btn" id="btnEjTest">Mandami un'email di prova</button></div>
+      <div class="small" id="ejMsg"></div>
+    </div>
+    <div class="field">
+      <label for="sVoiceEngine">Motore della voce</label>
+      <select id="sVoiceEngine">
+        <option value="device">Voce del dispositivo (sempre disponibile)</option>
+        <option value="google">Voce di Google (più naturale, gratis con un limite al giorno)</option>
+      </select>
+      <div id="gVoiceBox" hidden>
+        <div class="row" style="margin-top:8px">
+          <select id="sGVoice">
+            <option value="Charon">Charon · maschile, calma e chiara</option>
+            <option value="Orus">Orus · maschile, decisa</option>
+            <option value="Fenrir">Fenrir · maschile, energica</option>
+            <option value="Iapetus">Iapetus · maschile, limpida</option>
+            <option value="Algenib">Algenib · maschile, roca</option>
+            <option value="Puck">Puck · maschile, vivace</option>
+            <option value="Enceladus">Enceladus · maschile, morbida</option>
+            <option value="Kore">Kore · femminile, decisa</option>
+            <option value="Aoede">Aoede · femminile, leggera</option>
+            <option value="Zephyr">Zephyr · femminile, luminosa</option>
+          </select>
+          <button class="btn" id="btnTestGVoice">Prova</button>
+        </div>
+        <div class="small">Usa la chiave Google della riserva gratuita. Se il limite del giorno finisce, Jarvis passa da solo alla voce del dispositivo.</div>
+      </div>
+    </div>
+    <div class="field">
+      <label for="sVoice">Voce del dispositivo</label>
+      <div class="row">
+        <select id="sVoice"></select>
+        <button class="btn" id="btnTestVoice">Prova</button>
+      </div>
+      <div class="small" id="voiceMsg"></div>
+      <div class="sliders">
+        <label>Velocità <input type="range" id="sRate" min="0.8" max="1.3" step="0.01"><output id="oRate"></output></label>
+        <label>Tono <input type="range" id="sPitch" min="0.6" max="1.3" step="0.01"><output id="oPitch"></output></label>
+      </div>
+      <div class="small">Le voci con "naturale" sono le più realistiche. Sul Mac, con Microsoft Edge, trovi voci neurali gratuite come Diego e Giuseppe.</div>
+    </div>
+    <div class="field">
+      <label for="sProfile">Chi sei e cosa stai costruendo</label>
+      <textarea id="sProfile" placeholder="Es. Mi chiamo …, sto avviando una società di … e una pizzeria a …"></textarea>
+    </div>
+    <div class="toggle"><span>Cerca sul web quando serve</span><span class="switch"><input type="checkbox" id="sWeb"><i></i></span></div>
+    <div class="toggle"><span>Rispondi a voce</span><span class="switch"><input type="checkbox" id="sSpeak"><i></i></span></div>
+    <div class="toggle"><span>Chiamami per nome (ascolto continuo)</span><span class="switch"><input type="checkbox" id="sWake"><i></i></span></div>
+    <div class="small" style="margin-top:-10px">Funziona solo con l'app aperta in primo piano: lo schermo resta acceso da solo e consuma più batteria. Se l'iPad non lo permette, tocca la nuvola per parlare.</div>
+    <div class="btns">
+      <button class="btn primary" id="btnSave">Salva</button>
+      <button class="btn danger" id="btnClear">Cancella la conversazione</button>
+    </div>
+    <div class="savedmsg" id="savedMsg" aria-live="polite"></div>
+    <div class="field">
+      <span class="lbl">Diagnostica (ultima domanda)</span>
+      <pre id="diagBox" class="small" style="white-space:pre-wrap;margin:0;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(10,20,38,.6);max-height:220px;overflow:auto"></pre>
+      <div><button class="btn" id="btnDiag">Copia diagnostica</button></div>
+    </div>
+  </div></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= Utilità ================= */
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const API = 'https://generativelanguage.googleapis.com/v1beta';
+const MAX_FILE = 15 * 1024 * 1024;
+const MAX_REQUEST = 19 * 1024 * 1024;   // limite richiesta Gemini con file inline (~20 MB)
+const MAX_TEXT_CHARS = 2500000;         // ~700k token, sotto il limite di contesto
+const HISTORY = 30;
+
+const settings = Object.assign({
+  name: 'Atlas', key: '', model: '', voiceEngine: 'device', gVoice: 'Charon', ejService: '', ejTemplate: '', ejKey: '', myEmail: '', rate: 1.03, pitch: 1, claudeKey: '', claudeModel: 'claude-haiku-5-5', voice: '', profile: '', web: true, speak: true, wake: true
+}, LS.get('atlas.settings', {}));
+let chat = LS.get('atlas.chat', []);
+let stats = LS.get('atlas.stats', { day: today(), q: 0, src: 0 });
+let docs = [];
+
+function saveSettings() { LS.set('atlas.settings', settings); }
+function saveChat() {
+  if (chat.length > 300) chat = chat.slice(-300);
+  LS.set('atlas.chat', chat);
+}
+function bumpStats(q, src) {
+  if (stats.day !== today()) stats = { day: today(), q: 0, src: 0 };
+  stats.q += q; stats.src += src;
+  if (q) LS.set('atlas.total', LS.get('atlas.total', 0) + q);
+  LS.set('atlas.stats', stats);
+  renderCounters();
+}
+
+/* ================= Altezza reale (tastiera iOS) ================= */
+function fitViewport() {
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-h', h + 'px');
+  if (window.scrollY) window.scrollTo(0, 0);
+}
+fitViewport();
+(window.visualViewport || window).addEventListener('resize', fitViewport);
+window.addEventListener('orientationchange', () => setTimeout(fitViewport, 300));
+
+/* ================= Stato (solo nuvola + lettore schermo) ================= */
+let state = 'idle';
+const srText = { idle: 'In attesa', listening: 'In ascolto', thinking: 'Elaborazione in corso', speaking: 'Risposta in lettura' };
+function setState(s) {
+  if (state === s) return;
+  state = s;
+  Cloud.setState(s);
+  $('#srStatus').textContent = srText[s] || '';
+  if (s === 'idle') setTimeout(resumeWake, 350);
+  if (s !== 'speaking') Caption.hide(s === 'idle' ? 1400 : 0);
+}
+
+/* ================= Toast (solo quando serve) ================= */
+let toastTimer;
+function toast(msg, ms = 7000) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+$('#toast').addEventListener('click', () => $('#toast').classList.remove('show'));
+
+/* ================= Stelle di sfondo ================= */
+function drawStars() {
+  const c = $('#stars'), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const n = Math.round(w * h / 5200);
+  for (let i = 0; i < n; i++) {
+    const x = rnd() * w, y = rnd() * h, r = rnd() < 0.92 ? rnd() * 0.8 + 0.2 : rnd() * 0.7 + 0.9;
+    g.globalAlpha = 0.15 + rnd() * 0.55;
+    g.fillStyle = rnd() < 0.15 ? '#9FC4FF' : '#E8EEF6';
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+}
+
+/* ================= Cristallo di particelle 3D ================= */
+const Cloud = (() => {
+  const cv = $('#cloud'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1, pts = [], lines = [], rays = [], dust = [], anchors = [];
+  const targets = {
+    idle:      { scale: 1.00, speed: 0.07, bright: 1.00, red: 0, orange: 0, blue: 0.08 },
+    listening: { scale: 1.10, speed: 0.12, bright: 1.55, red: 0, orange: 0, blue: 0.24 },
+    thinking:  { scale: 1.00, speed: 0.18, bright: 0.85, red: 1, orange: 0, blue: 0.04 },
+    speaking:  { scale: 1.03, speed: 0.10, bright: 1.20, red: 0, orange: 1, blue: 0.05 }
+  };
+  const P = Object.assign({}, targets.idle);
+  let tgt = targets.idle, angle = 0.5, last = performance.now();
+  const geo = { cx: 0, cy: 0, R: 0 };
+  let area = null, cur = null;
+  const capEl = document.getElementById('caption'), capPos = {};
+  let links = [], lastRandomHit = 0, coreFlash = -9;
+  let labels = [];                      // { text, kind: 'doc' | 'web' | 'alert', born }
+  // rete neurale: impulsi che corrono lungo i collegamenti e si propagano da un nodo all'altro
+  let adj = [], pulses = [], pulseClock = 0, bursts = 0, stateName = 'idle';
+  // interazione: trascinare per ruotare, avvicinarsi con il dito/mouse per "accendere" i nodi
+  const drag = { down: false, moved: 0, lx: 0, ly: 0, vy: 0, pitch: 0, wasDrag: false };
+  const pointer = { x: -1e4, y: -1e4, t: -9 };
+  let pointerClock = 0;
+
+  function build() {
+    const small = Math.min(window.innerWidth, window.innerHeight) < 500;
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = () => (rnd() + rnd() + rnd() - 1.5) / 1.5;
+    pts = []; lines = []; rays = []; dust = []; anchors = [];
+    // vertici di un cristallo irregolare (doppia piramide inclinata)
+    const V = [[0.12, -1.15, 0.08], [-0.92, -0.06, 0.38], [0.66, -0.28, 0.62], [0.86, 0.22, -0.4], [-0.44, 0.2, -0.7], [-0.06, 0.98, 0.04]];
+    const E = [[0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [2, 3], [3, 4], [4, 1], [5, 1], [5, 2], [5, 3], [5, 4], [1, 3]];
+    const add = (x, y, z, o = {}) => { pts.push(Object.assign({ x, y, z, s: 0.5 + rnd() * 0.9, ph: rnd() * 6.283, hit: -9, warm: false, v: false }, o)); return pts.length - 1; };
+    const vi = V.map(v => add(v[0], v[1], v[2], { s: 2.1, v: true }));
+    const k = small ? 0.7 : 1;
+    // spigoli luminosi: tanti puntini lungo ogni lato
+    for (const [a, b] of E) {
+      const n = Math.round((a === 1 && b === 3 ? 18 : 40) * k);
+      let prev = vi[a];
+      for (let i = 1; i <= n; i++) {
+        const t = i / (n + 1), j = 0.05 + 0.04 * Math.sin(t * 3.14);
+        const idx = add(V[a][0] + (V[b][0] - V[a][0]) * t + gauss() * j, V[a][1] + (V[b][1] - V[a][1]) * t + gauss() * j, V[a][2] + (V[b][2] - V[a][2]) * t + gauss() * j, { s: 0.7 + rnd() * 1.1 });
+        lines.push([prev, idx, 1]); prev = idx;
+        if (i === Math.round(n / 2)) anchors.push(idx);
+      }
+      lines.push([prev, vi[b], 1]);
+    }
+    // facce e interno: puntini più radi
+    const faces = [[0, 1, 2], [0, 2, 3], [0, 3, 4], [0, 4, 1], [5, 1, 2], [5, 2, 3], [5, 3, 4], [5, 4, 1]];
+    for (let i = 0; i < 210 * k; i++) {
+      const f = faces[Math.floor(rnd() * faces.length)];
+      let u = rnd(), w = rnd(); if (u + w > 1) { u = 1 - u; w = 1 - w; }
+      const A = V[f[0]], B = V[f[1]], C = V[f[2]];
+      const sh = 0.55 + rnd() * 0.45;   // un po' verso l'interno
+      add((A[0] + (B[0] - A[0]) * u + (C[0] - A[0]) * w) * sh, (A[1] + (B[1] - A[1]) * u + (C[1] - A[1]) * w) * sh, (A[2] + (B[2] - A[2]) * u + (C[2] - A[2]) * w) * sh);
+    }
+    // nucleo denso e gruppo di puntini dorati
+    for (let i = 0; i < 170 * k; i++) add(gauss() * 0.3, gauss() * 0.42 - 0.08, gauss() * 0.3, { s: 0.45 + rnd() * 0.8 });
+    for (let i = 0; i < 80 * k; i++) add(0.58 + gauss() * 0.22, -0.22 + gauss() * 0.25, 0.38 + gauss() * 0.22, { warm: true, s: 0.6 + rnd() * 1.1 });
+    // scia che scende dalla punta bassa
+    for (let i = 0; i < 90 * k; i++) { const t = rnd(); add(-0.06 - t * 0.5 + gauss() * 0.12, 1.02 + t * 0.55, gauss() * 0.15, { s: 0.4 + rnd() * 0.6 }); }
+    // ragnatela: collego i puntini vicini
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], near = [];
+      for (let j = i + 1; j < n; j++) {
+        const b = pts[j], d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+        if (d < 0.035) near.push([d, j]);
+      }
+      near.sort((p, q) => p[0] - q[0]).slice(0, 3).forEach(([, j]) => lines.push([i, j, 0]));
+    }
+    // raggi lunghi e sottili dai vertici
+    for (const v of vi) for (let r = 0; r < 34 * k; r++) rays.push([v, Math.floor(rnd() * n)]);
+    for (let r = 0; r < 120 * k; r++) rays.push([Math.floor(rnd() * n), Math.floor(rnd() * n)]);
+    // polvere che fluttua attorno
+    for (let i = 0; i < (small ? 90 : 150); i++) {
+      const th = rnd() * 6.283, ph = Math.acos(2 * rnd() - 1), rad = 1.35 + rnd() * 1.2;
+      dust.push({ x: Math.sin(ph) * Math.cos(th) * rad, y: Math.cos(ph) * rad * 0.8, z: Math.sin(ph) * Math.sin(th) * rad, s: 0.3 + rnd() * 0.9, sp: 0.02 + rnd() * 0.05, ph: rnd() * 6.283 });
+    }
+    anchors = vi.slice(1, 5).concat([vi[0], vi[5]], anchors);
+    adj = pts.map(() => []);
+    for (const [a, b] of lines) { adj[a].push(b); adj[b].push(a); }
+    pulses = [];
+  }
+
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, r.width); H = Math.max(1, r.height);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  }
+
+  function spawnPulse(t, from) {
+    if (pulses.length > 170 || !adj.length) return;
+    let a = from;
+    if (a === undefined) { a = Math.floor(Math.random() * pts.length); if (!adj[a].length) return; }
+    if (!adj[a].length) return;
+    const b = adj[a][Math.floor(Math.random() * adj[a].length)];
+    pulses.push({ a, b, t0: t, dur: 0.3 + Math.random() * 0.45 });
+  }
+  function hitPoint(i, t) {
+    pts[i].hit = t;
+    if (links.length < 7 && Math.random() < 0.3) links.push({ i, t0: t });
+  }
+
+  const proj = [], dproj = [];
+  function project(p, R, cx, cy, ca, sa, ct, st, out) {
+    let x = p.x * ca + p.z * sa, z = -p.x * sa + p.z * ca, y = p.y;
+    const y2 = y * ct - z * st; z = y * st + z * ct; y = y2;
+    const f = 3.4 / (3.4 + z);
+    out.x = cx + x * R * f; out.y = cy + y * R * f; out.n = Math.max(0, Math.min(1, (1.2 - z) / 2.4));
+    return out;
+  }
+
+  function drawLabels(t, R, cx) {
+    if (!labels.length) return;
+    const small = W < 500;
+    ctx.save();
+    ctx.font = `600 ${small ? 10 : 11.5}px "Barlow Condensed", Manrope, sans-serif`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = small ? '1px' : '1.6px';
+    ctx.textBaseline = 'middle';
+    labels.forEach((l, i) => {
+      const o = proj[anchors[i % anchors.length]];
+      if (!o) return;
+      const a = Math.min(1, (t - l.born) / 0.6);
+      const side = o.x < cx ? -1 : 1;
+      if (l.kind === 'alert') {
+        // barra rossa che esce dalla struttura con il testo sopra
+        // su schermi stretti la barra arriva al bordo e il testo va su due righe
+        const x2 = small ? (side > 0 ? W - 10 : 10) : o.x + side * R * 0.95, y = o.y;
+        ctx.strokeStyle = `rgba(255,77,94,${0.85 * a})`; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(o.x, y); ctx.lineTo(x2, y); ctx.stroke();
+        ctx.fillStyle = `rgba(255,77,94,${a})`;
+        ctx.beginPath(); ctx.arc(o.x, y, 2.6, 0, 6.283); ctx.fill();
+        ctx.fillStyle = `rgba(255,120,132,${a})`;
+        ctx.textAlign = side < 0 ? 'left' : 'right';
+        const rows = small ? l.text.split(/:\s*/).map((r, n, all) => n < all.length - 1 ? r + ':' : r) : [l.text];
+        rows.forEach((r, n) => ctx.fillText(r, x2, y - 9 - (rows.length - 1 - n) * 13));
+      } else {
+        // etichetta azzurra (documento) o verde-acqua (fonte web) accanto al punto
+        const col = l.kind === 'web' ? '120,240,220' : '127,214,255';
+        const x2 = o.x + side * 16, y2 = o.y - 10;
+        ctx.strokeStyle = `rgba(${col},${0.5 * a})`; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(x2, y2); ctx.stroke();
+        ctx.fillStyle = `rgba(${col},${0.95 * a})`;
+        ctx.textAlign = side < 0 ? 'right' : 'left';
+        ctx.fillText(l.text, x2 + side * 4, y2);
+      }
+    });
+    ctx.restore();
+  }
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const still = reduceMotion.matches;
+    const k = 1 - Math.exp(-dt * (still ? 12 : 3.2));
+    for (const key in tgt) P[key] += (tgt[key] - P[key]) * k;
+    if (!still) angle += dt * P.speed;
+    angle += drag.vy; if (!drag.down) drag.vy *= Math.pow(0.04, dt);   // inerzia dopo il trascinamento
+    const t = now / 1000;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const A = area || { x: 0, y: 0, w: W, h: H };
+    const want = { cx: A.x + A.w / 2, cy: A.y + A.h / 2 - A.h * 0.02, R: Math.min(A.w * 0.27, A.h * 0.25) };
+    if (!cur) cur = Object.assign({}, want);
+    const km = still ? 1 : 1 - Math.exp(-dt * 5);
+    for (const key in want) cur[key] += (want[key] - cur[key]) * km;
+    const cx = cur.cx, cy = cur.cy;
+    const pulse = still ? 1 : 1 + P.orange * (0.05 * Math.sin(t * 8.5) + 0.025 * Math.sin(t * 15.3 + 1));
+    const R = cur.R * P.scale * pulse;
+    geo.cx = cx; geo.cy = cy; geo.R = R;
+    // i sottotitoli seguono la rete (anche quando si sposta per il pannello a lato)
+    const capX = Math.round(cx), capY = Math.round(cy + cur.R * 1.3), capW = Math.round(Math.min(560, (area ? A.w : W) - 48));
+    if (capX !== capPos.x || capY !== capPos.y || capW !== capPos.w) {
+      Object.assign(capPos, { x: capX, y: capY, w: capW });
+      capEl.style.left = capX + 'px'; capEl.style.top = capY + 'px'; capEl.style.width = capW + 'px';
+    }
+
+    // bagliori
+    const gb = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.6);
+    gb.addColorStop(0, `rgba(150,200,255,${P.blue})`);
+    gb.addColorStop(1, 'rgba(150,200,255,0)');
+    ctx.fillStyle = gb; ctx.fillRect(0, 0, W, H);
+    if (P.orange > 0.01) {
+      const oa = P.orange * (still ? 0.5 : 0.42 + 0.16 * Math.sin(t * 8.5));
+      const go = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.5);
+      go.addColorStop(0, `rgba(255,159,67,${oa})`);
+      go.addColorStop(0.45, `rgba(255,159,67,${oa * 0.4})`);
+      go.addColorStop(1, 'rgba(255,159,67,0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = go; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // proiezione
+    const tilt = 0.18 + drag.pitch + (still ? 0 : 0.08 * Math.sin(t * 0.19));
+    const ca = Math.cos(angle), sa = Math.sin(angle), ct = Math.cos(tilt), st = Math.sin(tilt);
+    for (let i = 0; i < pts.length; i++) project(pts[i], R, cx, cy, ca, sa, ct, st, proj[i] || (proj[i] = {}));
+
+    // polvere che fluttua lentamente
+    for (let i = 0; i < dust.length; i++) {
+      const d = dust[i];
+      const dy = still ? 0 : Math.sin(t * d.sp * 6 + d.ph) * 0.06;
+      const o = project({ x: d.x, y: d.y + dy, z: d.z }, R, cx, cy, ca, sa, ct, st, dproj[i] || (dproj[i] = {}));
+      ctx.fillStyle = `rgba(207,230,255,${(0.12 + 0.35 * o.n) * (still ? 1 : 0.7 + 0.3 * Math.sin(t * 1.3 + d.ph))})`;
+      ctx.fillRect(o.x, o.y, d.s, d.s);
+    }
+
+    // impulsi neurali: pochi in attesa, tanti quando ascolta, cerca o parla
+    const rate = { idle: 2.5, listening: 10, thinking: 22, speaking: 12 }[stateName] || 3;
+    if (!still) {
+      pulseClock += dt * rate;
+      while (bursts > 0) { spawnPulse(t); bursts--; }
+      while (pulseClock >= 1) { spawnPulse(t); pulseClock--; }
+      // vicino al dito/mouse i nodi si accendono e lanciano impulsi
+      if (t - pointer.t < 1.5) {
+        pointerClock += dt;
+        if (pointerClock > 0.08) {
+          pointerClock = 0;
+          let best = -1, bd = 70 * 70;
+          for (let i = 0; i < proj.length; i++) { const dx = proj[i].x - pointer.x, dy = proj[i].y - pointer.y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+          if (best >= 0) { pts[best].flash = t; spawnPulse(t, best); }
+        }
+      }
+    }
+
+    // ricerca: le particelle si accendono qua e là come fonti consultate
+    const scanning = P.red > 0.05;
+    if (scanning && tgt.red > 0.5) {
+      const every = still ? 0.25 : 0.05;
+      while (t - lastRandomHit > every) {
+        lastRandomHit = Math.max(lastRandomHit + every, t - 1);
+        const i = Math.floor(Math.random() * pts.length);
+        if (t - pts[i].hit > 2.2) hitPoint(i, t);
+      }
+    }
+
+    // raggi lunghi, poi ragnatela e spigoli
+    const lb = Math.min(1, P.bright) * (P.bright > 1.3 ? 1.3 : 1);
+    ctx.globalCompositeOperation = 'lighter';
+    const rayPath = new Path2D();
+    for (const [a, b] of rays) { rayPath.moveTo(proj[a].x, proj[a].y); rayPath.lineTo(proj[b].x, proj[b].y); }
+    ctx.lineWidth = 0.5; ctx.strokeStyle = `rgba(170,205,255,${0.07 * lb})`; ctx.stroke(rayPath);
+    const web = [new Path2D(), new Path2D()], edge = new Path2D(), lit = new Path2D();
+    let anyLit = false;
+    for (const [a, b, isEdge] of lines) {
+      const pa = proj[a], pb = proj[b];
+      if (scanning && Math.max(t - pts[a].hit, t - pts[b].hit) < 1.3) { lit.moveTo(pa.x, pa.y); lit.lineTo(pb.x, pb.y); anyLit = true; continue; }
+      const path = isEdge ? edge : web[(pa.n + pb.n) / 2 > 0.5 ? 1 : 0];
+      path.moveTo(pa.x, pa.y); path.lineTo(pb.x, pb.y);
+    }
+    ctx.lineWidth = 0.6;
+    ctx.strokeStyle = `rgba(180,215,255,${0.14 * lb})`; ctx.stroke(web[0]);
+    ctx.strokeStyle = `rgba(200,228,255,${0.26 * lb})`; ctx.stroke(web[1]);
+    ctx.lineWidth = 0.9; ctx.strokeStyle = `rgba(215,236,255,${0.38 * lb})`; ctx.stroke(edge);
+    if (anyLit) { ctx.strokeStyle = `rgba(255,77,94,${0.6 * P.red})`; ctx.lineWidth = 1; ctx.stroke(lit); }
+
+    // impulsi: punto luminoso con una scia, poi il nodo d'arrivo si accende e passa il segnale
+    const pc = P.red > 0.5 ? '255,95,110' : P.orange > 0.5 ? '255,196,110' : '170,230,255';
+    const next = [];
+    for (const q of pulses) {
+      const age = (t - q.t0) / q.dur;
+      if (age >= 1) {
+        pts[q.b].flash = t;
+        if (Math.random() < 0.55 && adj[q.b].length) {
+          const c = adj[q.b][Math.floor(Math.random() * adj[q.b].length)];
+          if (c !== q.a) next.push({ a: q.b, b: c, t0: t, dur: 0.3 + Math.random() * 0.45 });
+        }
+        continue;
+      }
+      next.push(q);
+      const A = proj[q.a], B = proj[q.b], x = A.x + (B.x - A.x) * age, y = A.y + (B.y - A.y) * age;
+      const tb = Math.max(0, age - 0.22), tx = A.x + (B.x - A.x) * tb, ty = A.y + (B.y - A.y) * tb;
+      const g = ctx.createLinearGradient(tx, ty, x, y);
+      g.addColorStop(0, `rgba(${pc},0)`); g.addColorStop(1, `rgba(${pc},0.9)`);
+      ctx.strokeStyle = g; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+      ctx.fillStyle = `rgba(${pc},0.95)`;
+      ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.283); ctx.fill();
+    }
+    pulses = next.slice(-200);
+
+    // collegamenti verso il centro durante la ricerca
+    if (scanning) {
+      links = links.filter(l => t - l.t0 < 0.95);
+      for (const l of links) {
+        const o = proj[l.i], a = (t - l.t0) / 0.95, ease = a * a * (3 - 2 * a);
+        ctx.strokeStyle = `rgba(255,120,130,${0.35 * (1 - a) * P.red})`; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(cx, cy); ctx.stroke();
+        ctx.fillStyle = `rgba(255,220,225,${0.95 * P.red})`;
+        ctx.beginPath(); ctx.arc(o.x + (cx - o.x) * ease, o.y + (cy - o.y) * ease, 2.2, 0, 6.283); ctx.fill();
+        if (a > 0.9) coreFlash = t;
+      }
+      const fl = Math.max(0, 1 - (t - coreFlash) / 0.4);
+      const gc = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.3);
+      gc.addColorStop(0, `rgba(255,90,105,${(0.22 + 0.35 * fl) * P.red})`);
+      gc.addColorStop(1, 'rgba(255,77,94,0)');
+      ctx.fillStyle = gc; ctx.beginPath(); ctx.arc(cx, cy, R * 0.3, 0, 6.283); ctx.fill();
+    } else links = [];
+
+    // puntini
+    const warmMix = P.orange * 0.6;
+    for (let i = 0; i < pts.length; i++) {
+      const o = proj[i], p = pts[i];
+      const tw = still ? 1 : 0.8 + 0.2 * Math.sin(t * 2.2 + p.ph);
+      const a = Math.min(1, (0.3 + 0.7 * o.n) * tw * Math.min(1.4, P.bright) * (p.v ? 1.2 : 0.9));
+      let size = p.s * (0.65 + 0.8 * o.n) * (P.bright > 1.3 ? 1.15 : 1);
+      const age = t - p.hit;
+      if (scanning && age < 1.6) {
+        const q = 1 - age / 1.6, mix = Math.min(1, age / 0.45);
+        size *= 1 + 1.8 * q;
+        ctx.fillStyle = `rgba(255,${Math.round(77 + 158 * mix)},${Math.round(94 + 146 * mix)},${Math.min(1, 0.55 + 0.45 * q) * P.red})`;
+        ctx.beginPath(); ctx.arc(o.x, o.y, size, 0, 6.283); ctx.fill();
+        if (age < 1 && !still) {
+          ctx.strokeStyle = `rgba(255,77,94,${0.7 * (1 - age) * P.red})`; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(o.x, o.y, size + age * 20, 0, 6.283); ctx.stroke();
+        }
+        continue;
+      }
+      const fl = t - (p.flash || -9);
+      if (fl < 0.5) {
+        const q = 1 - fl / 0.5;
+        size *= 1 + 1.6 * q;
+        const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, size * 4);
+        g.addColorStop(0, `rgba(${pc},${0.5 * q})`); g.addColorStop(1, `rgba(${pc},0)`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, size * 4, 0, 6.283); ctx.fill();
+      }
+      if (p.warm) ctx.fillStyle = `rgba(255,${Math.round(181 - 20 * warmMix)},71,${a})`;
+      else ctx.fillStyle = `rgba(${Math.round(207 + 48 * warmMix)},${Math.round(230 - 30 * warmMix)},${Math.round(255 - 105 * warmMix)},${a})`;
+      ctx.beginPath(); ctx.arc(o.x, o.y, size, 0, 6.283); ctx.fill();
+      if (p.v) {   // i vertici brillano
+        const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, size * 5);
+        g.addColorStop(0, `rgba(220,238,255,${0.35 * a})`); g.addColorStop(1, 'rgba(220,238,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, size * 5, 0, 6.283); ctx.fill();
+      }
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+    drawLabels(t, R, cx);
+    requestAnimationFrame(frame);
+  }
+
+  return {
+    init() {
+      build(); resize();
+      new ResizeObserver(resize).observe(cv);
+      requestAnimationFrame(t => { last = t; frame(t); });
+    },
+    setState(s) { tgt = targets[s] || targets.idle; stateName = s; bursts += 12; },
+    burst(n = 8) { bursts += n; },
+    // trascinamento: il tocco breve resta "parla", lo spostamento ruota la rete
+    pointerDown(x, y) { drag.down = true; drag.moved = 0; drag.lx = x; drag.ly = y; drag.wasDrag = false; pointer.x = x; pointer.y = y; pointer.t = performance.now() / 1000; },
+    pointerMove(x, y) {
+      pointer.x = x; pointer.y = y; pointer.t = performance.now() / 1000;
+      if (!drag.down) return;
+      const dx = x - drag.lx, dy = y - drag.ly;
+      drag.lx = x; drag.ly = y; drag.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.moved > 10) {
+        drag.wasDrag = true;
+        drag.vy = dx * 0.006;
+        drag.pitch = Math.max(-0.7, Math.min(0.7, drag.pitch + dy * 0.004));
+      }
+    },
+    pointerUp() { drag.down = false; },
+    wasDrag() { const w = drag.wasDrag; drag.wasDrag = false; return w; },
+    pulses() { return pulses.length; },
+    setArea(a) { area = a; },
+    // etichette attorno alla struttura (mantengo l'entrata graduale di quelle già presenti)
+    setLabels(list) {
+      const now = performance.now() / 1000;
+      labels = list.map(l => { const old = labels.find(o => o.text === l.text && o.kind === l.kind); return { ...l, born: old ? old.born : now }; });
+    },
+    labels() { return labels.map(l => l.kind + ':' + l.text); },
+    hit(x, y) { return Math.hypot(x - geo.cx, y - geo.cy) <= geo.R * 1.3; }
+  };
+})();
+
+/* ================= Markdown semplice ================= */
+function inlineMd(s) {
+  s = esc(s);
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  return s;
+}
+function renderMd(src) {
+  const out = [], lines = String(src).replace(/\r/g, '').split('\n');
+  let i = 0, para = [], list = null;
+  const flushP = () => { if (para.length) { out.push('<p>' + para.map(inlineMd).join('<br>') + '</p>'); para = []; } };
+  const flushL = () => { if (list) { out.push(`<${list.t}>` + list.items.map(x => '<li>' + inlineMd(x) + '</li>').join('') + `</${list.t}>`); list = null; } };
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^\s*```/.test(ln)) {
+      flushP(); flushL();
+      const code = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
+      i++;
+      out.push('<div class="pre"><pre><code>' + esc(code.join('\n')) + '</code></pre></div>');
+      continue;
+    }
+    let m;
+    if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { flushP(); if (!list || list.t !== 'ul') { flushL(); list = { t: 'ul', items: [] }; } list.items.push(m[1]); }
+    else if ((m = ln.match(/^\s*\d+[.)]\s+(.*)/))) { flushP(); if (!list || list.t !== 'ol') { flushL(); list = { t: 'ol', items: [] }; } list.items.push(m[1]); }
+    else if ((m = ln.match(/^\s*#{1,6}\s+(.*)/))) { flushP(); flushL(); out.push('<span class="h">' + inlineMd(m[1]) + '</span>'); }
+    else if (!ln.trim()) { flushP(); flushL(); }
+    else { flushL(); para.push(ln); }
+    i++;
+  }
+  flushP(); flushL();
+  return out.join('');
+}
+
+/* ================= Conversazione ================= */
+const icoCopy = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+const icoPlay = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
+
+const chatEl = $('#chat');
+function scrollChat() { requestAnimationFrame(() => { chatEl.scrollTop = chatEl.scrollHeight; }); }
+
+function copyText(text, btn) {
+  const done = () => { if (btn) { const old = btn.innerHTML; btn.classList.add('ok'); btn.innerHTML = icoCopy + 'Copiato'; setTimeout(() => { btn.classList.remove('ok'); btn.innerHTML = old; }, 1600); } };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done, () => fallback());
+  } else fallback();
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    try { document.execCommand('copy'); done(); } catch { toast('Copia non riuscita.'); }
+    ta.remove();
+  }
+}
+
+function msgEl(m) {
+  const el = document.createElement('div');
+  if (m.role === 'user') {
+    el.className = 'msg user';
+    el.textContent = m.text;
+    return el;
+  }
+  el.className = 'msg ai' + (m.error ? ' err' : '');
+  el.innerHTML = renderMd(m.text);
+  if (m.error) return el;
+  // pulsante copia sui blocchi di testo (es. messaggio per Claude)
+  el.querySelectorAll('.pre').forEach(box => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.style.marginTop = '6px';
+    b.innerHTML = icoCopy + 'Copia il testo';
+    b.addEventListener('click', () => copyText(box.querySelector('code').textContent, b));
+    box.appendChild(b);
+  });
+  const act = document.createElement('div');
+  act.className = 'actions';
+  const bc = document.createElement('button');
+  bc.className = 'chip'; bc.innerHTML = icoCopy + 'Copia';
+  bc.addEventListener('click', () => copyText(m.text, bc));
+  const br = document.createElement('button');
+  br.className = 'chip'; br.innerHTML = icoPlay + 'Riascolta';
+  br.addEventListener('click', () => TTS.speak(m.text));
+  act.append(bc, br);
+  el.appendChild(act);
+  if (m.sources && m.sources.length) {
+    const s = document.createElement('div');
+    s.className = 'sources';
+    s.innerHTML = '<span>Fonti</span>' + m.sources.map(x => `<a href="${esc(x.uri)}" target="_blank" rel="noopener">${esc(x.title || x.uri)}</a>`).join('');
+    el.appendChild(s);
+  }
+  return el;
+}
+
+function renderChat() {
+  chatEl.innerHTML = '';
+  chat.forEach(m => chatEl.appendChild(msgEl(m)));
+  scrollChat();
+}
+function addMsg(m, persist = true) {
+  if (persist) { chat.push(m); saveChat(); }
+  const el = msgEl(m);
+  chatEl.appendChild(el);
+  scrollChat();
+  return el;
+}
+function showError(text) {
+  addMsg({ role: 'model', text, error: true }, false);
+  if (!document.getElementById('app').classList.contains('textmode') && !(settings.speak && window.speechSynthesis)) toast(text, 10000);
+  if (settings.speak && window.speechSynthesis) TTS.speak(text); else { showChat(); setState('idle'); }
+}
+
+function renderCounters() {
+  if (stats.day !== today()) stats = { day: today(), q: 0, src: 0 };
+  $('#cQ').textContent = stats.q;
+  $('#cT').textContent = LS.get('atlas.total', 0).toLocaleString('it-IT');
+  $('#cS').textContent = stats.src;
+  const active = docs.filter(d => d.active).length;
+  $('#cD').textContent = active;
+  const b = $('#docBadge');
+  b.textContent = active; b.hidden = active === 0;
+  if (typeof refreshHud === 'function') refreshHud();
+}
+
+/* ================= HUD: orologio, stato del sistema, etichette ================= */
+function tickClock() {
+  const d = new Date();
+  $('#clockTime').textContent = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  $('#clockDate').textContent = d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
+}
+// avvisi veri, mostrati come barre rosse attorno alla struttura
+const alerts = new Set();
+const ALERT_TEXT = { credit: 'CREDITO CLAUDE: ESAURITO', key: 'CHIAVE CLAUDE: NON VALIDA', quota: 'LIMITE GRATUITO: RAGGIUNTO', docs: 'DOCUMENTI: TROPPO GRANDI', nokey: 'CHIAVE API: MANCANTE' };
+function setAlert(name, on) { const had = alerts.has(name); on ? alerts.add(name) : alerts.delete(name); if (had !== on) refreshHud(); }
+let webLabels = [];
+function setWebLabels(list) { webLabels = list.slice(0, 5); refreshHud(); }
+function refreshHud() {
+  // elenco in alto a destra
+  const active = docs.filter(d => d.active).length;
+  const engine = settings.claudeKey ? 'CLAUDE ' + (CLAUDE_NAMES[settings.claudeModel] || '').toUpperCase() : settings.key ? 'RISERVA GRATUITA' : 'NESSUNA CHIAVE';
+  const items = [
+    ['Motore', engine, settings.claudeKey ? (alerts.has('credit') || alerts.has('key') ? 'bad' : '') : settings.key ? '' : 'bad', ''],
+    ['Ricerca web', settings.web ? 'attiva' : 'spenta', settings.web ? '' : 'off', 'opt'],
+    ['Documenti', active ? active + ' in uso' : 'nessuno', active ? '' : 'off', 'opt'],
+    ['Voce', settings.speak ? 'attiva' : 'spenta', settings.speak ? '' : 'off', 'opt']
+  ];
+  $('#sysList').innerHTML = items.map(([k, v, c, o]) => `<li class="${o}">${esc(k)} <b>${esc(v)}</b><i class="${c}"></i></li>`).join('');
+  // etichette: documenti in uso, fonti web consultate, avvisi
+  const label = n => n.replace(/\.[a-z0-9]{2,5}$/i, '').replace(/[_-]+/g, ' ').toUpperCase().slice(0, 26);
+  const list = [];
+  docs.filter(d => d.active).slice(0, 6).forEach(d => list.push({ text: label(d.name), kind: 'doc' }));
+  webLabels.forEach(w => list.push({ text: w.toUpperCase().slice(0, 30), kind: 'web' }));
+  if (docsTooBig()) alerts.add('docs'); else alerts.delete('docs');
+  if (!hasKey()) alerts.add('nokey'); else alerts.delete('nokey');
+  [...alerts].slice(0, 3).forEach(a => list.push({ text: ALERT_TEXT[a], kind: 'alert' }));
+  // gli avvisi prendono i punti più in vista (i vertici)
+  list.sort((a, b) => (b.kind === 'alert') - (a.kind === 'alert'));
+  Cloud.setLabels(list);
+}
+
+/* ================= Sottotitoli ================= */
+const Caption = (() => {
+  const el = $('#caption'); let h;
+  return {
+    show(text) { clearTimeout(h); el.textContent = text; el.classList.add('show'); Cloud.burst(10); },
+    hide(delay = 0) { clearTimeout(h); h = setTimeout(() => el.classList.remove('show'), delay); }
+  };
+})();
+
+/* ================= Sintesi vocale ================= */
+const TTS = (() => {
+  const synth = window.speechSynthesis;
+  let voices = [], token = 0, startedAt = 0;
+  const MALE = /(luca|cosimo|diego|paolo|giorgio|roberto|marco|giuseppe|rocco|benigno|calogero|gianni|lorenzo|alessandro|riccardo|fabio|pietro|matteo|andrea|giovanni|stefano)/i;
+  const FEMALE = /(alice|federica|elsa|isabella|paola|emma|sara|giulia|chiara|silvia|francesca|elena|anna|martina|valentina|google italiano|carla|bianca|fiamma|palmira|imelda|irma|pina|serena)/i;
+  const isMale = v => MALE.test(v.name) && !FEMALE.test(v.name);
+  // voci neurali (es. Microsoft Diego Online su Edge) o versioni avanzate/premium
+  const isNatural = v => /(online|natural|neural|premium|enhanced|avanzat|migliorat)/i.test(v.name);
+
+  function load() {
+    if (!synth) return;
+    const all = synth.getVoices();
+    voices = all.filter(v => /^it([-_]|$)/i.test(v.lang));
+    fillSelect();
+  }
+  function pick() {
+    if (!voices.length) return null;
+    return voices.find(v => v.voiceURI === settings.voice || v.name === settings.voice)
+      || voices.find(v => isMale(v) && isNatural(v))
+      || voices.find(v => /luca/i.test(v.name) && /(enhanced|premium|avanzat|miglior)/i.test(v.name))
+      || voices.find(v => /luca/i.test(v.name))
+      || voices.find(isMale)
+      || voices[0];
+  }
+  function fillSelect(selected) {
+    const sel = $('#sVoice'); if (!sel) return;
+    const cur = selected || (pick() ? pick().voiceURI : '');
+    const sorted = voices.slice().sort((a, b) => (isMale(b) - isMale(a)) || (isNatural(b) - isNatural(a)) || a.name.localeCompare(b.name));
+    sel.innerHTML = sorted.length
+      ? sorted.map(v => `<option value="${esc(v.voiceURI)}"${v.voiceURI === cur ? ' selected' : ''}>${esc(v.name)}${isMale(v) ? ' · maschile' : ''}${isNatural(v) ? ' · naturale' : ''}</option>`).join('')
+      : '<option value="">Nessuna voce italiana trovata</option>';
+    $('#voiceMsg').textContent = voices.length && !voices.some(isMale)
+      ? 'Non trovo una voce maschile italiana. Su iPad: Impostazioni › Accessibilità › Contenuto letto › Voci › Italiano › scarica "Luca".' : '';
+  }
+  function clean(md) {
+    return speakable(md)
+      .replace(/```[\s\S]*?(```|$)/g, ' Ti ho preparato il testo da copiare. ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/[*_`#>|]/g, '')
+      .replace(/^\s*[-•]\s+/gm, '')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s+\n/g, '\n').trim();
+  }
+  function chunks(text) {
+    const parts = text.replace(/\n+/g, '. ').match(/[^.!?;:]+[.!?;:]*\s*/g) || [text];
+    const out = []; let cur = '';
+    for (const p of parts) {
+      if ((cur + p).length > 200 && cur) { out.push(cur.trim()); cur = ''; }
+      cur += p;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out.filter(s => /[\p{L}\p{N}]/u.test(s));
+  }
+  let pending = null;
+  function speak(text, onDone) {
+    if (!synth) { onDone && onDone(); setState('idle'); return; }
+    stop();
+    pauseListening();
+    // Chrome e Safari bloccano la voce finché non si tocca/clicca la pagina almeno una volta
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+      pending = { text, onDone };
+      setState('idle');
+      toast(`Tocca lo schermo per sentire la risposta di ${settings.name || 'Atlas'}.`, 15000);
+      return;
+    }
+    if (useGoogle()) {
+      ++token;
+      const sess = gSession(onDone);
+      sess.push(clean(text)); sess.close();
+      return;
+    }
+    const my = ++token;
+    const list = chunks(clean(text));
+    if (!list.length) { setState('idle'); onDone && onDone(); return; }
+    const v = pick();
+    const finish = () => { if (my !== token) return; token++; setState('idle'); onDone && onDone(); };
+    list.forEach((c, i) => {
+      const u = new SpeechSynthesisUtterance(c);
+      u.lang = v ? v.lang : 'it-IT';
+      if (v) u.voice = v;
+      u.rate = settings.rate || 1.03; u.pitch = settings.pitch || 1;
+      u.onstart = () => Caption.show(c);
+      if (i === list.length - 1) u.onend = finish;
+      u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') finish(); };
+      synth.speak(u);
+    });
+    startedAt = Date.now();
+    setState('speaking');
+  }
+  function stop() {
+    token++;
+    streamOpen = false;
+    gStop();
+    if (synth && (synth.speaking || synth.pending)) synth.cancel();
+  }
+
+  // ---- voce di Google (gratis con la chiave di Google AI Studio, con un limite giornaliero) ----
+  const G = { ctx: null, src: null, active: false, failedUntil: 0, warned: false };
+  const useGoogle = () => settings.voiceEngine === 'google' && !!settings.key && Date.now() > G.failedUntil;
+  function gctx() {
+    if (!G.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) G.ctx = new AC(); }
+    if (G.ctx && G.ctx.state === 'suspended') G.ctx.resume();
+    return G.ctx;
+  }
+  function ttsModel() {
+    const ids = LS.get('atlas.ttsmodels', []).filter(id => /flash/i.test(id) && !/pro/i.test(id));
+    const ver = id => { const m = id.match(/(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+    return ids.sort((a, b) => ver(b) - ver(a))[0] || 'gemini-2.5-flash-preview-tts';
+  }
+  async function gSynth(text, voice = settings.gVoice || 'Charon') {
+    const model = ttsModel(), ctx = gctx();
+    if (!ctx) throw Object.assign(new Error('audio non disponibile'), { status: 0 });
+    const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 30000);
+    let res;
+    try {
+      res = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.key)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } })
+      });
+    } catch (e) { throw Object.assign(new Error('connessione'), { status: 0 }); }
+    finally { clearTimeout(to); }
+    let data = null; try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      const msg = (data && data.error && data.error.message) || '';
+      logDiag(`Voce di Google (${model}, ${voice}) → ${res.status} ${msg.slice(0, 200)}`);
+      throw Object.assign(new Error(msg || 'errore ' + res.status), { status: res.status });
+    }
+    const parts = (data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+    const part = parts.find(p => p.inlineData && p.inlineData.data);
+    if (!part) throw Object.assign(new Error('nessun audio'), { status: 0 });
+    // audio PCM a 16 bit, mono (frequenza indicata nel tipo, di solito 24000)
+    const rate = +((part.inlineData.mimeType || '').match(/rate=(\d+)/) || [])[1] || 24000;
+    const bin = atob(part.inlineData.data), n = bin.length >> 1;
+    const buf = ctx.createBuffer(1, Math.max(1, n), rate), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) { const v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); ch[i] = (v >= 32768 ? v - 65536 : v) / 32768; }
+    return buf;
+  }
+  function gPlay(buf) {
+    return new Promise(resolve => {
+      const ctx = gctx(), src = ctx.createBufferSource();
+      src.buffer = buf; src.connect(ctx.destination);
+      src.onended = () => { if (G.src === src) G.src = null; resolve(); };
+      G.src = src; src.start();
+    });
+  }
+  function gStop() { G.active = false; if (G.src) { try { G.src.stop(); } catch {} G.src = null; } }
+  // una "sessione" di lettura: i pezzi vengono generati subito (in parallelo) e letti in ordine;
+  // se Google non risponde (limite raggiunto) si passa alla voce del dispositivo senza fermarsi
+  function gSession(onDone) {
+    const my = token, items = [], v = pick();
+    let closed = false, pumping = false, started = false, device = false, devOpen = 0;
+    G.active = true;
+    const finish = () => { if (my !== token) return; G.active = false; token++; setState('idle'); onDone && onDone(); };
+    const begin = () => { if (!started) { started = true; startedAt = Date.now(); setState('speaking'); } };
+    const done = () => { if (my === token && closed && !items.length && devOpen <= 0 && !pumping) finish(); };
+    const devSay = text => {
+      if (!synth) return;
+      for (const c of chunks(text)) {
+        const u = new SpeechSynthesisUtterance(c);
+        u.lang = v ? v.lang : 'it-IT'; if (v) u.voice = v;
+        u.rate = settings.rate || 1.03; u.pitch = settings.pitch || 1;
+        u.onstart = () => { begin(); Caption.show(c); };
+        devOpen++;
+        u.onend = () => { devOpen--; done(); };
+        u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') { devOpen--; done(); } };
+        synth.speak(u);
+      }
+    };
+    const toDevice = e => {
+      device = true;
+      G.failedUntil = Date.now() + (e && e.status === 429 ? 30 * 60000 : 5 * 60000);
+      if (!G.warned) { G.warned = true; toast(e && e.status === 429 ? 'La voce di Google ha raggiunto il limite gratuito: per ora uso la voce del dispositivo.' : 'La voce di Google non risponde: per ora uso la voce del dispositivo.', 8000); }
+    };
+    async function pump() {
+      if (pumping) return;
+      pumping = true;
+      while (items.length && my === token) {
+        const it = items[0];
+        let buf = null;
+        if (!device) { try { buf = await it.p; } catch (e) { toDevice(e); } }
+        if (my !== token) return;
+        items.shift();
+        if (!buf) { devSay(it.text); continue; }
+        begin(); Caption.show(it.text);
+        await gPlay(buf);
+      }
+      pumping = false;
+      done();
+    }
+    return {
+      push(text) {
+        text = String(text).trim();
+        if (!/[\p{L}\p{N}]/u.test(text)) return;
+        if (device) { devSay(text); return; }
+        const p = gSynth(text); p.catch(() => {});
+        items.push({ text, p }); pump();
+      },
+      close() { closed = true; done(); }
+    };
+  }
+  // lettura "in diretta": parte dalla prima frase completa mentre il resto arriva ancora
+  let streamOpen = false;
+  function live() {
+    stop();
+    pauseListening();
+    if (!synth || (navigator.userActivation && !navigator.userActivation.hasBeenActive)) {
+      // voce non ancora permessa: leggerò tutto alla fine (speak gestisce l'attesa del tocco)
+      return { update() {}, finish(t) { speak(t); } };
+    }
+    if (useGoogle()) {
+      ++token;
+      const sess = gSession();
+      let sent = 0;
+      const first = raw => { const m = /[.!?;:](?=\s)|\n/.exec(raw); return m ? m.index + 1 : -1; };
+      return {
+        update(raw) { if (!sent) { const e = first(raw); if (e > 0) { sess.push(clean(raw.slice(0, e))); sent = e; } } },
+        finish(raw) { if (raw.length > sent) sess.push(clean(raw.slice(sent))); sess.close(); }
+      };
+    }
+    const my = ++token, v = pick();
+    let done = 0, open = 0, closed = false, started = false;
+    streamOpen = true;
+    const check = () => { if (my !== token) return; if (closed && open <= 0) { streamOpen = false; token++; setState('idle'); } };
+    const say = seg => {
+      for (const c of chunks(clean(seg))) {
+        const u = new SpeechSynthesisUtterance(c);
+        u.lang = v ? v.lang : 'it-IT'; if (v) u.voice = v;
+        u.rate = settings.rate || 1.03; u.pitch = settings.pitch || 1;
+        u.onstart = () => Caption.show(c);
+        open++;
+        u.onend = () => { open--; check(); };
+        u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') { open--; check(); } };
+        synth.speak(u);
+        if (!started) { started = true; startedAt = Date.now(); setState('speaking'); }
+      }
+    };
+    // fine dell'ultima frase completa, fuori dai blocchi di codice
+    const cut = raw => {
+      let end = -1;
+      const re = /[.!?;:](?=\s)|\n/g;
+      let m;
+      while ((m = re.exec(raw))) {
+        const p = m.index + 1;
+        if (p <= done) continue;
+        if (((raw.slice(0, p).match(/```/g) || []).length % 2) === 0) end = p;
+      }
+      return end;
+    };
+    return {
+      update(raw) {
+        if (my !== token) return;
+        const end = cut(raw);
+        if (end > done) { say(raw.slice(done, end)); done = end; }
+      },
+      finish(raw) {
+        if (my !== token) return;
+        if (raw.length > done) say(raw.slice(done));
+        done = raw.length;
+        closed = true;
+        streamOpen = false;      // da qui in poi tutte le frasi sono in coda: vale il controllo di sicurezza
+        if (!started) { streamOpen = false; setState('idle'); } else check();
+      }
+    };
+  }
+  // sicurezza: alcuni iOS non inviano "onend"
+  setInterval(() => {
+    if (state === 'speaking' && !streamOpen && !G.active && synth && Date.now() - startedAt > 1500 && !synth.speaking && !synth.pending) { token++; setState('idle'); }
+  }, 600);
+  let unlocked = false;
+  document.addEventListener('click', () => { if (G.ctx && G.ctx.state === 'suspended') G.ctx.resume(); }, true);
+  function unlock() {
+    if (settings.voiceEngine === 'google') gctx();
+    if (unlocked || !synth) return;
+    unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch {}
+  }
+  if (synth) {
+    load();
+    synth.addEventListener ? synth.addEventListener('voiceschanged', load) : (synth.onvoiceschanged = load);
+    let tries = 0; const iv = setInterval(() => { load(); if (voices.length || ++tries > 10) clearInterval(iv); }, 500);
+  }
+  // primo tocco sulla pagina: leggo la risposta rimasta in attesa (e non faccio partire altro)
+  document.addEventListener('click', e => {
+    if (!pending) return;
+    e.stopPropagation(); e.preventDefault();
+    const p = pending; pending = null;
+    $('#toast').classList.remove('show');
+    speak(p.text, p.onDone);
+  }, true);
+  return { speak, live, stop, unlock, load, fillSelect,
+    testGoogle(voice) {
+      gctx();
+      const prev = [settings.voiceEngine, settings.gVoice];
+      settings.voiceEngine = 'google'; settings.gVoice = voice;
+      G.failedUntil = 0;
+      speak(`Ciao, sono ${settings.name || 'Atlas'}. Questa è la mia voce.`, () => {});
+      [settings.voiceEngine, settings.gVoice] = prev;
+    },
+    test(uri) {
+    const v = voices.find(x => x.voiceURI === uri);
+    const prev = settings.voice; settings.voice = uri;
+    speak(`Ciao, sono ${settings.name || 'Atlas'}. Questa è la mia voce.`, () => {});
+    settings.voice = prev;
+    if (!v) toast('Voce non disponibile su questo dispositivo.');
+  } };
+})();
+['touchend', 'click'].forEach(ev => document.addEventListener(ev, TTS.unlock, { once: true, capture: true }));
+
+/* ================= Riconoscimento vocale + parola di attivazione ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recRunning = false, mode = 'off';   // off | standby (aspetta il nome) | command (ascolta la domanda)
+let full = '', cursor = 0, cmdStart = 0, cmdByWake = false;
+let silenceTimer = null, liveEl = null;
+let failCount = 0, lastStart = 0, needGesture = false, hadSession = false, tapStarted = false, stopWarned = false;
+
+const wakeOn = () => !!(settings.wake && SR && (settings.key || settings.claudeKey));
+const panelsOpen = () => Object.values(panels).some(p => p.classList.contains('open'));
+
+function micUnavailable() {
+  mode = 'off';
+  setState('idle');
+  const touch = navigator.maxTouchPoints > 0;
+  toast(touch
+    ? "Il microfono dell'app non funziona qui. Tocca la freccia e usa il microfono della tastiera per dettare la domanda."
+    : "Il microfono non è disponibile in questo browser. Sul Mac usa Chrome (e consenti il microfono), oppure attiva Siri e Dettatura nelle Impostazioni di Sistema. Intanto puoi scrivere con la freccia.", 11000);
+}
+
+// confronto "a orecchio": Jarvis ≈ Giarvis ≈ Jarvi
+const normW = w => w.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+const phon = w => w.replace(/^gi(?=[aou])/, 'j').replace(/^g(?=[ei])/, 'j').replace(/y/g, 'i').replace(/w/g, 'v').replace(/k/g, 'c').replace(/h/g, '').replace(/(.)\1+/g, '$1');
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+function sameWord(heard, wake) {
+  const a = phon(normW(heard)), b = phon(wake);
+  if (!a) return false;
+  const tol = b.length <= 3 ? 0 : b.length <= 6 ? 1 : 2;
+  return lev(a, b) <= tol;
+}
+const cleanQ = s => { s = s.replace(/^[\s,.:;!?\-–]+/, '').trim(); return s ? s[0].toUpperCase() + s.slice(1) : ''; };
+function findWake(seg) {
+  const wake = (settings.name || 'Atlas').split(/\s+/).map(normW).filter(Boolean);
+  if (!wake.length) return null;
+  const toks = [...seg.matchAll(/\S+/g)];
+  for (let i = toks.length - wake.length; i >= 0; i--) {
+    if (wake.every((w, k) => sameWord(toks[i + k][0], w))) {
+      const last = toks[i + wake.length - 1];
+      const end = last.index + last[0].length;
+      return { offset: end, text: cleanQ(seg.slice(end)) };
+    }
+  }
+  return null;
+}
+function currentQuestion() {
+  if (cmdByWake) { const q = findWake(full.slice(cursor)); if (q) return q.text; }
+  return cleanQ(full.slice(cmdStart));
+}
+
+function startRec() {
+  if (recRunning) return true;
+  if (!SR) return false;
+  try {
+    rec = new SR();
+    rec.lang = 'it-IT';
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.maxAlternatives = 1;
+  } catch { rec = null; return false; }
+  full = ''; cursor = 0; cmdStart = 0;
+  rec.onstart = () => { hadSession = true; stopWarned = false; };
+  rec.onresult = onRecResult;
+  rec.onerror = onRecError;
+  rec.onend = onRecEnd;
+  try { rec.start(); } catch { rec = null; return false; }
+  recRunning = true; lastStart = Date.now();
+  keepAwake(true);
+  return true;
+}
+function stopRec() { if (rec) { try { rec.abort(); } catch {} } }
+
+function onRecResult(e) {
+  let t = '';
+  for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
+  full = t.replace(/\s+/g, ' ').trim();
+  failCount = 0;
+  if (mode === 'command') Cloud.burst(3);
+  if (mode === 'standby') {
+    const q = findWake(full.slice(cursor));
+    if (!q) return;
+    mode = 'command'; cmdByWake = true; cmdStart = cursor + q.offset;
+    TTS.stop();
+    setState('listening');
+    showLive(q.text);
+    armSilence(q.text ? 1700 : 6000);
+  } else if (mode === 'command') {
+    const text = currentQuestion();
+    showLive(text);
+    armSilence(text ? 1700 : 7000);
+  }
+}
+function onRecError(e) {
+  if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(e.error)) {
+    if (tapStarted) { tapStarted = false; clearLive(); micUnavailable(); }
+    else listeningStopped();
+    mode = 'off';
+  } else if (e.error === 'network' && mode === 'command') {
+    mode = 'off'; clearLive(); setState('idle');
+    toast('Il riconoscimento vocale richiede la connessione a internet.');
+  }
+}
+function onRecEnd() {
+  const was = mode, q = was === 'command' ? currentQuestion() : '';
+  recRunning = false; rec = null; tapStarted = false;
+  clearTimeout(silenceTimer);
+  mode = 'off';
+  if (was === 'command') {
+    clearLive();
+    if (q) { ask(q); return; }
+    if (state === 'listening') { setState('idle'); return; }
+  }
+  if (!wakeOn() || needGesture || busy || state !== 'idle' || document.hidden || panelsOpen()) { if (!wakeOn()) keepAwake(false); return; }
+  // il browser chiude l'ascolto dopo un po': lo riapro
+  if (Date.now() - lastStart < 1500) {
+    if (++failCount > 4) { listeningStopped(); return; }
+  } else failCount = 0;
+  setTimeout(resumeWake, 250 + 300 * failCount);
+}
+function resumeWake() {
+  if (!wakeOn() || needGesture || busy || state !== 'idle' || document.hidden || panelsOpen()) return;
+  if (recRunning) { if (mode !== 'command') { mode = 'standby'; cursor = full.length; } return; }
+  mode = 'standby';
+  if (!startRec()) { mode = 'off'; listeningStopped(); }
+}
+// l'ascolto continuo non riparte da solo (succede su iPad): serve un tocco
+function listeningStopped() {
+  needGesture = true;
+  if (hadSession && !stopWarned) { stopWarned = true; toast("L'ascolto continuo si è fermato: tocca lo schermo per riattivarlo."); }
+}
+function pauseListening() {
+  clearTimeout(silenceTimer); clearLive();
+  mode = 'off';
+  stopRec();
+  if (state === 'listening') setState('idle');
+}
+
+function armSilence(ms) { clearTimeout(silenceTimer); silenceTimer = setTimeout(finishCommand, ms); }
+function finishCommand() {
+  if (mode !== 'command') return;
+  const text = currentQuestion();
+  clearLive();
+  if (!text) { backToStandby(); return; }
+  mode = 'off';
+  stopRec();
+  ask(text);
+}
+function backToStandby() {
+  clearTimeout(silenceTimer); clearLive();
+  cursor = full.length;
+  if (wakeOn() && recRunning) mode = 'standby'; else { mode = 'off'; stopRec(); }
+  setState('idle');
+}
+function showLive(text) {
+  if (!text) return;
+  if (!liveEl) { liveEl = addMsg({ role: 'user', text }, false); liveEl.classList.add('live'); }
+  else liveEl.textContent = text;
+  scrollChat();
+}
+function clearLive() { if (liveEl) { liveEl.remove(); liveEl = null; } }
+
+function beginCommand() {
+  if (!settings.key && !settings.claudeKey) { openPanel('settings'); return; }
+  if (!SR) { micUnavailable(); return; }
+  TTS.stop();
+  needGesture = false; failCount = 0;
+  if (!recRunning && !startRec()) { micUnavailable(); return; }
+  tapStarted = true;                 // l'ha chiesto l'utente: se il microfono è negato lo spiego
+  mode = 'command'; cmdByWake = false; cmdStart = full.length;
+  setState('listening');
+  armSilence(8000);
+}
+
+function onCloudTap() {
+  if (state === 'idle') beginCommand();
+  else if (state === 'listening') backToStandby();
+  else if (state === 'speaking') { TTS.stop(); setState('idle'); }
+}
+$('#cloudWrap').addEventListener('click', e => { if (Cloud.wasDrag()) return; if (Cloud.hit(e.clientX, e.clientY)) onCloudTap(); });
+$('#cloudWrap').addEventListener('pointerdown', e => Cloud.pointerDown(e.clientX, e.clientY));
+window.addEventListener('pointermove', e => Cloud.pointerMove(e.clientX, e.clientY));
+window.addEventListener('pointerup', () => Cloud.pointerUp());
+window.addEventListener('pointercancel', () => Cloud.pointerUp());
+$('#cloudWrap').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCloudTap(); } });
+// iOS: l'ascolto può ripartire solo dopo un tocco
+document.addEventListener('click', () => { if (needGesture && wakeOn()) { needGesture = false; failCount = 0; resumeWake(); } }, true);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { pauseListening(); keepAwake(false); }
+  else setTimeout(resumeWake, 400);
+});
+
+// schermo sempre acceso mentre l'ascolto continuo è attivo
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && settings.wake && !wakeLock && 'wakeLock' in navigator && !document.hidden) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch {}
+}
+
+/* ================= Freccia: mostra la conversazione scritta ================= */
+const input = $('#input'), composer = $('#composer'), appEl = $('#app');
+function openComposer() {
+  if (Side.isOpen()) Side.close();
+  appEl.classList.add('textmode');
+  composer.classList.add('open');
+  input.tabIndex = 0;
+  input.focus();
+  scrollChat();
+  updateCloudArea();
+}
+function updateCloudArea() {
+  requestAnimationFrame(() => {
+    const text = appEl.classList.contains('textmode'), side = $('#side').classList.contains('open');
+    if (!text && !side) { Cloud.setArea(null); return; }
+    const c = document.querySelector(text ? '#chat' : '#side').getBoundingClientRect(), W = innerWidth;
+    Cloud.setArea(c.left > W * 0.35
+      ? { x: 0, y: 0, w: c.left, h: c.bottom }           // conversazione a destra: nuvola a sinistra
+      : { x: 0, y: 40, w: W, h: Math.max(80, c.top - 40) });  // conversazione in basso: nuvola sopra
+  });
+}
+window.addEventListener('resize', updateCloudArea);
+function showChat() {
+  if (Side.isOpen()) Side.close();
+  appEl.classList.add('textmode');
+  composer.classList.add('open');
+  input.tabIndex = 0;
+  scrollChat();
+  updateCloudArea();
+}
+function closeComposer() {
+  appEl.classList.remove('textmode');
+  updateCloudArea();
+  composer.classList.remove('open');
+  input.tabIndex = -1;
+  input.blur();
+}
+// segnaposto più corto sugli schermi stretti (iPhone)
+const narrow = window.matchMedia('(max-width: 430px)');
+const setPlaceholder = () => { input.placeholder = narrow.matches ? 'Scrivi…' : 'Scrivi la domanda…'; };
+setPlaceholder();
+narrow.addEventListener ? narrow.addEventListener('change', setPlaceholder) : narrow.addListener(setPlaceholder);
+function autoGrow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 132) + 'px'; input.style.overflowY = input.scrollHeight > 132 ? 'auto' : 'hidden'; }
+input.addEventListener('input', autoGrow);
+function submitComposer() {
+  const text = input.value.trim();
+  if (!text) { closeComposer(); return; }
+  input.value = ''; autoGrow();
+  input.blur();
+  if (state === 'listening') backToStandby();
+  ask(text);
+}
+$('#btnSend').addEventListener('click', () => {
+  if (!composer.classList.contains('open')) openComposer();
+  else submitComposer();
+});
+// evita che il tocco sulla freccia tolga il focus (e chiuda la tastiera) prima dell'invio
+$('#btnSend').addEventListener('mousedown', e => { if (composer.classList.contains('open')) e.preventDefault(); });
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submitComposer(); }
+  if (e.key === 'Escape') { if (!input.value.trim()) closeComposer(); }
+});
+/* ================= Pannello a lato e promemoria ================= */
+// cose che l'utente ha chiesto di ricordare (solo su questo dispositivo)
+const Memory = (() => {
+  const words = t => new Set(t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 2));
+  const similar = (a, b) => { const A = words(a), B = words(b); if (!A.size || !B.size) return 0; let n = 0; A.forEach(w => { if (B.has(w)) n++; }); return n / Math.min(A.size, B.size); };
+  return {
+    all() { return LS.get('atlas.memory', []); },
+    add(text) {
+      const m = this.all();
+      if (!m.some(x => similar(x.text, text) > 0.85)) m.push({ text, ts: Date.now() });
+      LS.set('atlas.memory', m.slice(-80));
+    },
+    forget(text) {
+      const m = this.all(), keep = m.filter(x => similar(x.text, text) < 0.6);
+      LS.set('atlas.memory', keep);
+      return m.length - keep.length;
+    },
+    removeAt(i) { const m = this.all(); m.splice(i, 1); LS.set('atlas.memory', m); }
+  };
+})();
+
+// segni che l'assistente mette nella risposta: <lato titolo="…">…</lato>, <ricorda>…</ricorda>, <dimentica>…</dimentica>, <mostra_promemoria/>, <chiudi_lato/>
+function parseTags(text) {
+  let side = null, showMem = false, closeSide = false, email = null;
+  const remember = [], forget = [];
+  const attr = (a, n) => { const m = a.match(new RegExp('(?:^|\\s)' + n + '\\s*=\\s*["“\'«]([^"”\'»]*)["”\'»]', 'i')); return m ? m[1].trim() : ''; };
+  let clean = String(text)
+    .replace(/<email\b([^>]*)>([\s\S]*?)(?:<\/email>|$)/gi, (m, a, body) => { email = { to: attr(a, 'a'), subject: attr(a, 'oggetto'), body: body.trim() }; return ' '; })
+    .replace(/<lato(?:\s+titolo\s*=\s*["“'«]?([^"”'»>]*)["”'»]?)?\s*>([\s\S]*?)(?:<\/lato>|$)/gi, (m, title, body) => { side = { title: (title || '').trim() || 'Per te', body: body.trim() }; return ' '; })
+    .replace(/<ricorda>([\s\S]*?)(?:<\/ricorda>|$)/gi, (m, b) => { if (b.trim()) remember.push(b.trim()); return ''; })
+    .replace(/<dimentica>([\s\S]*?)(?:<\/dimentica>|$)/gi, (m, b) => { if (b.trim()) forget.push(b.trim()); return ''; })
+    .replace(/<mostra_promemoria\s*\/?>/gi, () => { showMem = true; return ''; })
+    .replace(/<chiudi_lato\s*\/?>/gi, () => { closeSide = true; return ''; })
+    .replace(/<chiama\b[\s\S]*?(?:<\/chiama>|$)/gi, ' ');
+  clean = clean.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return { clean, side, remember, forget, showMem, closeSide, email };
+}
+// la parte da leggere a voce: senza quello che va a lato o nei promemoria (anche se è ancora a metà)
+function speakable(raw) {
+  return String(raw)
+    .replace(/<email\b[\s\S]*?(?:<\/email>|$)/gi, ' ')
+    .replace(/<lato[\s\S]*?(?:<\/lato>|$)/gi, ' ')
+    .replace(/<(ricorda|dimentica)>[\s\S]*?(?:<\/\1>|$)/gi, '')
+    .replace(/<(?:mostra_promemoria|chiudi_lato)\s*\/?>/gi, '')
+    .replace(/<chiama\b[\s\S]*?(?:<\/chiama>|$)/gi, ' ')
+    .replace(/<\/?[a-z_]*(?:\s[^>]*)?$/i, '');
+}
+
+// invio email con EmailJS (SDK ufficiale da CDN), sempre dopo conferma dell'utente
+const EMAILJS_SDK = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@5.0.2/dist/email.min.js';
+const Mail = {
+  ready() { return !!(settings.ejService && settings.ejTemplate && settings.ejKey); },
+  valid(a) { return /^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(String(a).trim()); },
+  async send({ to, subject, body }, cfg = settings) {
+    await loadScript(EMAILJS_SDK);
+    try {
+      await window.emailjs.send(cfg.ejService, cfg.ejTemplate,
+        { to_email: to, subject, message: body, reply_to: cfg.myEmail || '', from_name: cfg.name || 'Jarvis' },
+        { publicKey: cfg.ejKey });
+    } catch (e) {
+      const st = e && e.status, txt = (e && e.text) || (e && e.message) || '';
+      logDiag(`EmailJS → ${st || 'errore'} ${String(txt).slice(0, 200)}`);
+      if (st === 400 || st === 404) throw new Error('i codici di EmailJS (Service, Template o Public key) non sono giusti: controllali nelle Impostazioni');
+      if (st === 401 || st === 403) throw new Error('EmailJS ha rifiutato la richiesta: controlla la Public key e che l\'indirizzo del sito sia permesso');
+      if (st === 412) throw new Error('il collegamento di EmailJS con Gmail va rifatto: apri EmailJS › Email Services e ricollega Gmail');
+      if (st === 429) throw new Error('hai raggiunto il limite di invii di EmailJS: riprova più tardi');
+      throw new Error('l\'invio non è riuscito (' + (txt || st || 'errore di rete') + ')');
+    }
+    const sent = LS.get('atlas.sent', []); sent.push({ to, subject, ts: Date.now() }); LS.set('atlas.sent', sent.slice(-100));
+  },
+  mailto({ to, subject, body }) { return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }
+};
+
+const Side = (() => {
+  const el = $('#side');
+  let note = null, fresh = [];
+  function renderMem() {
+    const m = Memory.all();
+    $('#sideMem').hidden = !m.length;
+    $('#memList').innerHTML = m.map((x, i) => `<li class="${fresh.includes(x.text) ? 'new' : ''}"><span>${esc(x.text)}</span><button data-i="${i}" aria-label="Dimentica">×</button></li>`).join('');
+  }
+  $('#memList').addEventListener('click', e => {
+    const b = e.target.closest('button[data-i]'); if (!b) return;
+    Memory.removeAt(+b.dataset.i); renderMem();
+    if (!note && !Memory.all().length) Side.close();
+  });
+  $('#sideClose').addEventListener('click', () => Side.close());
+  // scheda email: modificabile, si invia solo premendo "Invia"
+  const emMsg = (t, cls = '') => { const m = $('#emMsg'); m.textContent = t; m.className = 'small ' + cls; };
+  const emRefresh = () => {
+    const ok = Mail.valid($('#emTo').value);
+    $('#emSend').textContent = Mail.ready() ? 'Invia' : 'Apri in Mail';
+    $('#emSend').disabled = !ok;
+    if (!ok && !$('#emMsg').classList.contains('ok')) emMsg($('#emTo').value.trim() ? 'L\'indirizzo non sembra valido.' : 'Manca l\'indirizzo del destinatario.');
+    else if (ok && !$('#emMsg').classList.contains('ok')) emMsg(Mail.ready() ? 'Controlla il testo e premi Invia.' : 'Invio da Gmail non configurato: si aprirà l\'app Mail con l\'email pronta.');
+  };
+  ['#emTo', '#emSubject', '#emBody'].forEach(id => $(id).addEventListener('input', () => { $('#emMsg').classList.remove('ok'); emRefresh(); }));
+  $('#emCancel').addEventListener('click', () => { $('#sideEmail').hidden = true; if (!note && !Memory.all().length) Side.close(); });
+  $('#emSend').addEventListener('click', async () => {
+    const mail = { to: $('#emTo').value.trim(), subject: $('#emSubject').value.trim(), body: $('#emBody').value.trim() };
+    if (!Mail.valid(mail.to)) return emRefresh();
+    if (!Mail.ready()) { location.href = Mail.mailto(mail); return; }
+    $('#emSend').disabled = true; emMsg('Invio in corso…');
+    try {
+      await Mail.send(mail);
+      emMsg(`✓ Inviata a ${mail.to}`, 'ok');
+      $('#emSend').disabled = true;
+      addMsg({ role: 'model', text: `_Email inviata a ${mail.to}: «${mail.subject}»_`, ts: Date.now() });
+      if (settings.speak && window.speechSynthesis) TTS.speak('Email inviata.');
+    } catch (e) {
+      emMsg('Non inviata: ' + e.message + '.', 'bad');
+      $('#emSend').disabled = false;
+    }
+  });
+  $('#sideCopy').addEventListener('click', e => note && copyText(note.body, e.currentTarget));
+  return {
+    open({ note: n, email, highlight = [] } = {}) {
+      if (email) {      // l'email si mostra sempre, anche con la conversazione aperta: va confermata
+        if (appEl.classList.contains('textmode')) closeComposer();
+        $('#emTo').value = email.to || ''; $('#emSubject').value = email.subject || ''; $('#emBody').value = email.body || '';
+        $('#emMsg').className = 'small'; $('#sideEmail').hidden = false; emRefresh();
+      } else $('#sideEmail').hidden = true;
+      if (appEl.classList.contains('textmode')) return;   // con la conversazione aperta è già tutto scritto lì
+      note = n || null; fresh = highlight;
+      $('#sideNote').hidden = !note;
+      if (note) { $('#sideTitle').textContent = note.title; $('#sideText').innerHTML = renderMd(note.body); }
+      renderMem();
+      if (!note && !email && !Memory.all().length) return;
+      el.classList.add('open'); el.setAttribute('aria-hidden', 'false');
+      updateCloudArea();
+    },
+    close() { el.classList.remove('open'); el.setAttribute('aria-hidden', 'true'); updateCloudArea(); },
+    isOpen() { return el.classList.contains('open'); },
+    refresh() { if (this.isOpen()) renderMem(); }
+  };
+})();
+
+/* ================= Squadra: chat stile WhatsApp con gli agenti ================= */
+const Team = (() => {
+  const AG = {
+    jarvis: { color: '#7FD6FF', initials: 'J', role: 'coordinatore della squadra' },
+    email: { name: 'Email e clienti', color: '#FFB547', initials: '@', role: 'scrive le email a clienti e fornitori' },
+    pm: { name: 'Project manager', color: '#7bd3a4', initials: 'PM', role: 'organizza attività, priorità e scadenze' }
+  };
+  const nameOf = id => id === 'user' ? 'Tu' : id === 'jarvis' ? (settings.name || 'Jarvis') : AG[id].name;
+  const CHATS = [
+    { id: 'group', title: 'Soci', sub: () => `${nameOf('jarvis')}, Email e clienti, Project manager, Tu`, av: { color: '#c9d6e6', initials: 'S' } },
+    { id: 'jarvis', title: () => nameOf('jarvis'), sub: () => 'coordinatore', av: AG.jarvis },
+    { id: 'email', title: 'Email e clienti', sub: () => AG.email.role, av: AG.email },
+    { id: 'pm', title: 'Project manager', sub: () => AG.pm.role, av: AG.pm }
+  ];
+  const val = x => typeof x === 'function' ? x() : x;
+  let data = LS.get('atlas.team', { chats: {}, unread: {} });
+  const save = () => {
+    for (const k in data.chats) data.chats[k] = data.chats[k].slice(-200);
+    LS.set('atlas.team', data);
+  };
+  const msgs = id => (data.chats[id] = data.chats[id] || []);
+  let current = 'group', working = false;
+
+  // ---- attività del Project manager ----
+  const Tasks = {
+    all() { return LS.get('atlas.tasks', []); },
+    add(text, due) { const t = this.all(); if (!t.some(x => !x.done && x.text.toLowerCase() === text.toLowerCase())) t.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text, due: due || '', done: false }); LS.set('atlas.tasks', t); },
+    done(text) {
+      const t = this.all(), q = text.toLowerCase();
+      const hit = t.find(x => !x.done && (x.text.toLowerCase().includes(q) || q.includes(x.text.toLowerCase())));
+      if (hit) { hit.done = true; LS.set('atlas.tasks', t); }
+    }
+  };
+
+  // segni degli agenti: <chiama agente="email|pm">…</chiama>, <attivita scadenza="AAAA-MM-GG">…</attivita>, <fatto>…</fatto>, più <email …> come Jarvis
+  function agentId(s) {
+    s = String(s).toLowerCase();
+    return /mail|client/.test(s) ? 'email' : /pm|project|manager|attivit/.test(s) ? 'pm' : /jarvis|coord/.test(s) || s === (settings.name || '').toLowerCase() ? 'jarvis' : '';
+  }
+  function parseAgent(text) {
+    const calls = [], tasks = [], done = [];
+    const attr = (a, n) => { const m = a.match(new RegExp('(?:^|\\s)' + n + '\\s*=\\s*["“\'«]([^"”\'»]*)["”\'»]', 'i')); return m ? m[1].trim() : ''; };
+    let t = String(text)
+      .replace(/<chiama\b([^>]*)>([\s\S]*?)(?:<\/chiama>|$)/gi, (m, a, b) => { const id = agentId(attr(a, 'agente')); if (id && b.trim()) calls.push({ id, text: b.trim() }); return ''; })
+      .replace(/<attivita\b([^>]*)>([\s\S]*?)(?:<\/attivita>|$)/gi, (m, a, b) => { if (b.trim()) tasks.push({ text: b.trim(), due: attr(a, 'scadenza') }); return ''; })
+      .replace(/<fatto>([\s\S]*?)(?:<\/fatto>|$)/gi, (m, b) => { if (b.trim()) done.push(b.trim()); return ''; });
+    const tg = parseTags(t);
+    return { text: tg.clean, email: tg.email, calls, tasks, done };
+  }
+  // testo da mostrare mentre arriva (senza i segni)
+  const visible = raw => speakable(String(raw).replace(/<chiama\b[\s\S]*?(?:<\/chiama>|$)/gi, '').replace(/<attivita\b[\s\S]*?(?:<\/attivita>|$)/gi, '').replace(/<fatto>[\s\S]*?(?:<\/fatto>|$)/gi, ''));
+
+  function system(agent, chat) {
+    const now = new Date();
+    const date = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const mem = Memory.all(), tasks = Tasks.all().filter(x => !x.done);
+    const base = [
+      `Fai parte della squadra di lavoro digitale dell'utente, che chatta con voi come su WhatsApp. Membri: ${nameOf('jarvis')} (coordinatore), Email e clienti (scrive email), Project manager (attività e scadenze). Tu sei: ${nameOf(agent)}, ${AG[agent].role}.`,
+      `Oggi è ${date}.`,
+      settings.profile ? `Chi è l'utente e cosa sta costruendo:\n"""${settings.profile}"""` : '',
+      settings.myEmail ? `L'email dell'utente è ${settings.myEmail}.` : '',
+      mem.length ? 'Cose che l\'utente ha chiesto di ricordare:\n' + mem.map(x => '- ' + x.text).join('\n') : '',
+      tasks.length ? 'Attività aperte:\n' + tasks.map(x => `- ${x.text}${x.due ? ' (entro ' + x.due + ')' : ''}`).join('\n') : 'Non ci sono attività aperte.',
+      'REGOLE: rispondi in italiano, in chat: breve, concreto, niente giri di parole. Non inventare mai: se non sai qualcosa dillo o chiedilo. Non nominare mai il modello di intelligenza artificiale che ti fa funzionare. Lavorate solo mentre l\'app è aperta: non promettere di fare cose più tardi da solo.',
+      'I messaggi degli altri ti arrivano nel formato «Nome: testo».',
+      `SIETE COLLEGATI: se ti serve un collega, o l'utente ti chiede di chiedere qualcosa a uno di loro, chiamalo con <chiama agente="pm">istruzione precisa e completa, con tutto il contesto</chiama> (agente="email" per Email e clienti, agente="jarvis" per ${nameOf('jarvis')}). Il collega risponde subito dopo di te, nella stessa chat. Non chiamare te stesso, non chiamare se non serve e non inventare le risposte dei colleghi.`
+    ];
+    const role = {
+      jarvis: 'Sei il coordinatore. Rispondi in 1-3 frasi a tutto (strategia, numeri, leggi, idee). Liste, piani e attività sono lavoro del Project manager, le email di Email e clienti: passaglielo con <chiama>, una riga per collega, invece di farlo tu.',
+      email: 'Prepari email complete (saluto, testo, firma con il nome dell\'utente se lo conosci) dentro <email a="indirizzo" oggetto="oggetto">testo</email>, una per destinatario. Non inventare mai gli indirizzi: se non li sai lascia a="" e chiedili (o cercali sul web se sono pubblici, citando la fonte). Non dire mai che l\'email è stata inviata: la invia l\'utente premendo Invia.',
+      pm: 'Quando ti chiedono una lista (per esempio aziende o clienti da contattare), falla tu subito: concreta, in ordine di priorità, con il motivo in poche parole; per dati reali cerca sul web e cita la fonte, senza inventare nomi. Gestisci l\'elenco delle attività. Per aggiungere: <attivita scadenza="AAAA-MM-GG">cosa fare</attivita> (scadenza facoltativa). Quando una è finita: <fatto>attività</fatto>. Fai piani chiari e brevi, con priorità e prossimi passi.'
+    }[agent];
+    return base.concat(role).filter(Boolean).join('\n');
+  }
+
+  // conversazione vista da un agente: i suoi messaggi sono "assistant", gli altri "user" con il nome davanti
+  function history(agent, chat, instruction, from = 'jarvis') {
+    const out = [];
+    for (const m of msgs(chat).slice(-24)) {
+      if (m.from === 'sys') continue;
+      const mine = m.from === agent;
+      const body = (m.text || '') + (m.email ? `\n[Email per ${m.email.to || '?'} — «${m.email.subject}»${m.sent ? ' — inviata' : ''}]` : '');
+      const text = mine ? body : `${nameOf(m.from)}: ${body}`;
+      const role = mine ? 'model' : 'user';
+      if (out.length && out[out.length - 1].role === role) out[out.length - 1].text += '\n\n' + text;
+      else out.push({ role, text });
+    }
+    if (instruction) {
+      const t = `${nameOf(from)} ti chiede: ${instruction}`;
+      if (out.length && out[out.length - 1].role === 'user') out[out.length - 1].text += '\n\n' + t; else out.push({ role: 'user', text: t });
+    }
+    while (out.length && out[0].role !== 'user') out.shift();
+    return out;
+  }
+
+  // ---- interfaccia ----
+  const $m = $('#teamMsgs');
+  const time = ts => new Date(ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const avatar = (av, el) => { el.style.background = av.color; el.textContent = av.initials; };
+  function renderList() {
+    $('#teamChats').innerHTML = '';
+    for (const c of CHATS) {
+      const list = msgs(c.id), last = list[list.length - 1], un = data.unread[c.id] || 0;
+      const it = document.createElement('div');
+      it.className = 'chat-it' + (c.id === current ? ' on' : '');
+      it.dataset.id = c.id;
+      it.innerHTML = `<span class="av"></span><div class="tx"><b></b><span class="pv"></span></div><div class="meta"><span>${last ? time(last.ts) : ''}</span>${un ? `<span class="un">${un}</span>` : ''}</div>`;
+      avatar(c.av, it.querySelector('.av'));
+      it.querySelector('b').textContent = val(c.title);
+      it.querySelector('.pv').textContent = last ? (c.id === 'group' && last.from !== 'user' ? nameOf(last.from) + ': ' : '') + (last.email ? '✉ ' + last.email.subject : last.text).replace(/[*_#`>]/g, '') : val(c.sub);
+      it.addEventListener('click', () => open(c.id));
+      $('#teamChats').appendChild(it);
+    }
+    const tot = Object.values(data.unread).reduce((a, b) => a + b, 0);
+    $('#teamBadge').textContent = tot; $('#teamBadge').hidden = !tot;
+  }
+  function renderTasks() {
+    const box = $('#teamTasks'), t = Tasks.all();
+    if (!(current === 'pm' || current === 'group') || !t.length) { box.hidden = true; return; }
+    box.hidden = false;
+    const open_ = t.filter(x => !x.done).length;
+    box.innerHTML = `<h4>Attività · ${open_} da fare</h4>` + t.slice(-12).map(x => `<label class="${x.done ? 'done' : ''}"><input type="checkbox" data-id="${x.id}" ${x.done ? 'checked' : ''}><span>${esc(x.text)}</span>${x.due ? `<em>${esc(new Date(x.due + 'T12:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }))}</em>` : ''}</label>`).join('');
+  }
+  $('#teamTasks').addEventListener('change', e => {
+    const id = e.target.dataset.id; if (!id) return;
+    const t = Tasks.all(), x = t.find(y => y.id === id); if (x) { x.done = e.target.checked; LS.set('atlas.tasks', t); renderTasks(); }
+  });
+  function bubble(m, i) {
+    const el = document.createElement('div');
+    if (m.from === 'sys') { el.className = 'tm sys'; el.textContent = m.text; return el; }
+    el.className = 'tm ' + (m.from === 'user' ? 'out' : 'in');
+    let html = '';
+    if ((current === 'group' || m.from !== current) && m.from !== 'user') html += `<span class="who" style="color:${(AG[m.from] || AG.jarvis).color}">${esc(nameOf(m.from))}</span>`;
+    if (m.text) html += renderMd(m.text);
+    (m.calls || []).forEach(c => { html += `<span class="call">→ ${esc(nameOf(c.id))}: ${esc(c.text)}</span>`; });
+    el.innerHTML = html;
+    if (m.email) el.appendChild(emailCard(m, i));
+    const tm = document.createElement('span'); tm.className = 'tm-t'; tm.textContent = time(m.ts); el.appendChild(tm);
+    return el;
+  }
+  function emailCard(m, i) {
+    const e = m.email, card = document.createElement('div');
+    card.className = 'ecard';
+    card.innerHTML = `<div class="eh">A: <b></b></div><div class="eh">Oggetto: <b></b></div><div class="eb"></div><div class="ea"></div>`;
+    const hb = card.querySelectorAll('.eh b'); hb[0].textContent = e.to || '(manca l\'indirizzo)'; hb[1].textContent = e.subject;
+    card.querySelector('.eb').textContent = e.body;
+    const ea = card.querySelector('.ea');
+    if (m.sent) { ea.innerHTML = `<span class="ok">✓ Inviata</span>`; return card; }
+    const ok = Mail.valid(e.to);
+    const send = document.createElement('button'); send.className = 'chip'; send.textContent = Mail.ready() ? 'Invia' : 'Apri in Mail'; send.disabled = !ok;
+    const copy = document.createElement('button'); copy.className = 'chip'; copy.textContent = 'Copia';
+    copy.addEventListener('click', () => copyText(e.body, copy));
+    send.addEventListener('click', async () => {
+      if (!Mail.ready()) { location.href = Mail.mailto(e); return; }
+      if (!confirm(`Inviare l'email a ${e.to}?\n\nOggetto: ${e.subject}`)) return;
+      send.disabled = true; send.textContent = 'Invio…';
+      try { await Mail.send(e); m.sent = true; save(); render(); }
+      catch (err) { send.disabled = false; send.textContent = 'Invia'; push(current, { from: 'sys', text: 'Email non inviata: ' + err.message + '.' }); }
+    });
+    ea.append(send, copy);
+    if (!ok) ea.insertAdjacentHTML('beforeend', '<div class="eh">Scrivi l\'indirizzo nella chat e l\'agente la rifà.</div>');
+    return card;
+  }
+  function renderMsgs() {
+    $m.innerHTML = '';
+    msgs(current).forEach((m, i) => $m.appendChild(bubble(m, i)));
+    $m.scrollTop = $m.scrollHeight;
+  }
+  function render() {
+    const c = CHATS.find(x => x.id === current);
+    avatar(c.av, $('#convAv'));
+    $('#convName').textContent = val(c.title); $('#convSub').textContent = val(c.sub);
+    renderList(); renderTasks(); renderMsgs();
+    $('#teamSend').disabled = working;
+  }
+  function open(id) {
+    current = id; data.unread[id] = 0; save();
+    $('#team').classList.add('open-chat');
+    render();
+  }
+  function push(chat, m) {
+    m.ts = m.ts || Date.now();
+    msgs(chat).push(m);
+    if (!(panelVisible() && chat === current) && m.from !== 'user') data.unread[chat] = (data.unread[chat] || 0) + 1;
+    save();
+    if (panelVisible()) render(); else renderList();
+  }
+  const panelVisible = () => $('#panelTeam').classList.contains('open');
+
+  // un agente risponde nella chat (in diretta, con "sta scrivendo…")
+  async function reply(agent, chat, instruction, from) {
+    let live = null;
+    const showLive = txt => {
+      if (!panelVisible() || chat !== current) return;
+      if (!live) { live = document.createElement('div'); live.className = 'tm in typing'; $m.appendChild(live); }
+      live.classList.toggle('typing', !txt);
+      live.innerHTML = (chat === 'group' || agent !== chat ? `<span class="who" style="color:${AG[agent].color}">${esc(nameOf(agent))}</span>` : '') + (txt ? renderMd(txt) : 'sta scrivendo…');
+      $m.scrollTop = $m.scrollHeight;
+    };
+    showLive('');
+    try {
+      const out = await llm({ system: system(agent, chat), msgs: history(agent, chat, instruction, from), onText: t => showLive(visible(t)) });
+      if (live) live.remove();
+      const r = parseAgent(out.text);
+      r.tasks.forEach(t => Tasks.add(t.text, t.due));
+      r.done.forEach(t => Tasks.done(t));
+      r.calls = r.calls.filter(c => c.id !== agent);
+      push(chat, { from: agent, text: r.text, email: r.email || undefined, calls: r.calls.length ? r.calls : undefined });
+      return r;
+    } catch (e) {
+      if (live) live.remove();
+      push(chat, { from: 'sys', text: `${nameOf(agent)} non ha risposto: ${e instanceof AIError ? e.message : (e && e.message) || e}` });
+      return null;
+    }
+  }
+  async function send(text) {
+    text = String(text || '').trim();
+    if (!text || working) return;
+    if (!hasKey()) { push(current, { from: 'sys', text: 'Manca una chiave API: aggiungila nelle Impostazioni.' }); return; }
+    const chat = current;
+    push(chat, { from: 'user', text });
+    await run(chat, [{ id: chat === 'group' ? 'jarvis' : chat }]);
+  }
+  // giro di lavoro: chi viene chiamato risponde nella stessa chat e può chiamare a sua volta (massimo 4 passaggi)
+  let chain = Promise.resolve();
+  function run(chat, queue) {
+    const job = chain.then(async () => {
+      working = true; $('#teamSend').disabled = true;
+      const done = [];
+      let hops = 0;
+      try {
+        while (queue.length) {
+          const it = queue.shift();
+          const r = await reply(it.id, chat, it.text, it.from);
+          if (!r) break;
+          done.push({ id: it.id, ...r });
+          for (const c of r.calls) if (hops < 4) { hops++; queue.push({ id: c.id, text: c.text, from: it.id }); }
+        }
+      } finally { working = false; $('#teamSend').disabled = false; }
+      return done;
+    });
+    chain = job.catch(() => {});
+    return job;
+  }
+  // lavoro chiesto a voce a Jarvis: lo scrivo nel gruppo Soci, i colleghi rispondono lì e la risposta arriva a lato
+  async function delegate(question, said, calls) {
+    push('group', { from: 'user', text: '🎙 ' + question });
+    push('group', { from: 'jarvis', text: said, calls });
+    toast(`${calls.map(c => nameOf(c.id)).join(' e ')} ${calls.length > 1 ? 'stanno' : 'sta'} lavorando…`, 4000);
+    const res = (await run('group', calls.map(c => ({ id: c.id, text: c.text, from: 'jarvis' })))).filter(r => r.id !== 'jarvis' || r.email);
+    if (!res.length) return;
+    const mail = res.slice().reverse().find(r => r.email);
+    const notes = res.filter(r => r.text).map(r => `**${nameOf(r.id)}**\n\n${r.text}`).join('\n\n');
+    if (mail) Side.open({ email: mail.email, note: notes ? { title: 'Dalla Squadra', body: notes } : null });
+    else if (notes) Side.open({ note: { title: 'Dalla Squadra', body: notes } });
+    if (!(settings.speak && window.speechSynthesis)) return;
+    // aspetto che Jarvis abbia finito di parlare
+    for (let i = 0; i < 300 && (busy || state !== 'idle'); i++) await new Promise(r => setTimeout(r, 100));
+    if (busy || state !== 'idle') return;
+    const ids = [...new Set(res.map(r => r.id))], who = ids.length > 1 ? 'La squadra' : ids[0] === 'pm' ? 'Il Project manager' : nameOf(ids[0]);
+    TTS.speak(`${who} ha risposto: te l'ho scritto a lato.` + (mail ? ' C\'è anche un\'email da controllare prima di premere Invia.' : ''));
+  }
+
+  const input = $('#teamInput');
+  const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 120) + 'px'; };
+  input.addEventListener('input', grow);
+  const submit = () => { const t = input.value; if (!t.trim() || working) return; input.value = ''; grow(); send(t); };
+  $('#teamSend').addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
+  $('#teamBack').addEventListener('click', () => $('#team').classList.remove('open-chat'));
+  renderList();
+  return { render() { data.unread[current] = 0; save(); render(); }, send, open, delegate, nameOf, tasks: () => Tasks.all(), calls: t => parseAgent(t).calls.filter(c => c.id !== 'jarvis') };
+})();
+
+/* ================= Documenti (IndexedDB) ================= */
+const DB = (() => {
+  let dbp = null;
+  function open() {
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error('IndexedDB non disponibile'));
+      const r = indexedDB.open('atlas', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('docs', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return dbp;
+  }
+  async function tx(mode, fn) {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('docs', mode), st = t.objectStore('docs');
+      const req = fn(st);
+      t.oncomplete = () => res(req && req.result);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error || new Error('Operazione annullata'));
+    });
+  }
+  return {
+    all: () => tx('readonly', s => s.getAll()),
+    put: d => tx('readwrite', s => s.put(d)),
+    del: id => tx('readwrite', s => s.delete(id))
+  };
+})();
+
+const scripts = {};
+function loadScript(src) {
+  return scripts[src] || (scripts[src] = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.onload = res;
+    s.onerror = () => { delete scripts[src]; rej(new Error('Impossibile caricare la libreria (sei offline?)')); };
+    document.head.appendChild(s);
+  }));
+}
+const LIB_XLSX = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+const LIB_MAMMOTH = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1] || '');
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+}
+const IMG_MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', gif: 'image/gif' };
+
+async function processFile(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (file.size > MAX_FILE) throw new Error(`"${file.name}" supera i 15 MB.`);
+  const base = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name: file.name, size: file.size, active: true, added: Date.now() };
+  if (ext === 'pdf' || file.type === 'application/pdf') {
+    return Object.assign(base, { kind: 'inline', mime: 'application/pdf', label: 'PDF', data: await fileToBase64(file) });
+  }
+  if (file.type.startsWith('image/') || IMG_MIME[ext]) {
+    let mime = file.type && file.type.startsWith('image/') ? file.type : IMG_MIME[ext];
+    if (mime === 'image/gif') mime = 'image/png';
+    return Object.assign(base, { kind: 'inline', mime, label: 'Foto', data: await fileToBase64(file) });
+  }
+  if (ext === 'xlsx' || ext === 'xls') {
+    await loadScript(LIB_XLSX);
+    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    const text = wb.SheetNames.map(n => `--- Foglio: ${n} ---\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join('\n\n');
+    return Object.assign(base, { kind: 'text', label: 'Excel', text });
+  }
+  if (ext === 'docx') {
+    await loadScript(LIB_MAMMOTH);
+    const r = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    return Object.assign(base, { kind: 'text', label: 'Word', text: r.value });
+  }
+  if (ext === 'doc') throw new Error(`"${file.name}": il vecchio formato .doc non è supportato. Salvalo come .docx o PDF.`);
+  if (['csv', 'txt', 'md', 'json', 'tsv'].includes(ext) || file.type.startsWith('text/')) {
+    return Object.assign(base, { kind: 'text', label: ext.toUpperCase() || 'Testo', text: await file.text() });
+  }
+  throw new Error(`"${file.name}": formato non supportato.`);
+}
+
+function docBytes(d) { return d.kind === 'inline' ? d.data.length : new Blob([d.text]).size; }
+function activeLoad() {
+  const act = docs.filter(d => d.active);
+  return {
+    bytes: act.reduce((s, d) => s + docBytes(d), 0),
+    chars: act.filter(d => d.kind === 'text').reduce((s, d) => s + d.text.length, 0)
+  };
+}
+function docsTooBig() { const l = activeLoad(); return l.bytes > MAX_REQUEST || l.chars > MAX_TEXT_CHARS; }
+
+function renderDocs() {
+  const list = $('#docList');
+  if (!docs.length) list.innerHTML = '<div class="empty">Nessun documento caricato.</div>';
+  else {
+    list.innerHTML = '';
+    docs.slice().sort((a, b) => b.added - a.added).forEach(d => {
+      const row = document.createElement('div');
+      row.className = 'doc' + (d.active ? '' : ' off');
+      row.innerHTML = `<label class="use"><input type="checkbox"${d.active ? ' checked' : ''}><span>in uso</span></label>
+        <div class="info"><div class="name"></div><div class="meta">${esc(d.label)} · ${fmtSize(d.size)}</div></div>
+        <button class="del" aria-label="Elimina"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>`;
+      row.querySelector('.name').textContent = d.name;
+      row.querySelector('input').addEventListener('change', async e => {
+        d.active = e.target.checked;
+        try { await DB.put(d); } catch {}
+        renderDocs();
+      });
+      row.querySelector('.del').addEventListener('click', async () => {
+        if (!confirm(`Eliminare "${d.name}" da questo dispositivo?`)) return;
+        try { await DB.del(d.id); } catch {}
+        docs = docs.filter(x => x !== d);
+        renderDocs();
+      });
+      list.appendChild(row);
+    });
+  }
+  const w = $('#docWarn');
+  if (docsTooBig()) {
+    w.hidden = false;
+    w.innerHTML = `<b>Documenti troppo grandi.</b> Insieme superano il limite accettato in una sola domanda (${fmtSize(activeLoad().bytes)} su circa ${fmtSize(MAX_REQUEST)}). Togli la spunta "in uso" a qualche documento.`;
+  } else w.hidden = true;
+  renderCounters();
+}
+
+$('#fileInput').addEventListener('change', async e => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  const busy = $('#docBusy');
+  const errors = [];
+  for (const [i, f] of files.entries()) {
+    busy.hidden = false;
+    busy.textContent = `Elaboro ${f.name} (${i + 1} di ${files.length})…`;
+    try {
+      const d = await processFile(f);
+      await DB.put(d);
+      docs.push(d);
+      renderDocs();
+    } catch (err) {
+      errors.push(err && err.name === 'QuotaExceededError' ? `"${f.name}": spazio esaurito sul dispositivo.` : (err.message || String(err)));
+    }
+  }
+  busy.hidden = true;
+  if (errors.length) alert(errors.join('\n'));
+});
+
+/* ================= Gemini ================= */
+function systemPrompt(useWeb = settings.web) {
+  const now = new Date();
+  const date = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const time = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const act = docs.filter(d => d.active).map(d => d.name);
+  return [
+    `Sei ${settings.name || 'Atlas'}, l'assistente personale a 360 gradi dell'utente: lo aiuti mentre crea e gestisce le sue aziende (per esempio una società e una pizzeria). Rispondi su qualsiasi tema: numeri e fatturati di aziende, ricette, leggi e burocrazia italiana, fisco, marketing, finanza, tecnologia, cultura generale.`,
+    `Oggi è ${date}, ore ${time} (ora del dispositivo).`,
+    settings.profile ? `Chi è l'utente e cosa sta costruendo (scritto da lui):\n"""${settings.profile}"""` : '',
+    'REGOLE:',
+    `- Non nominare mai Claude, Anthropic, Gemini, Google AI o il modello che ti fa funzionare. Sei ${settings.name || 'Atlas'}: se ti chiedono chi sei o come funzioni, rispondi che sei ${settings.name || 'Atlas'}, l'assistente personale dell'utente.`,
+    '- Rispondi sempre in italiano, in modo breve e diretto: 2-5 frasi, perché la risposta viene letta ad alta voce. Allungati solo se l\'utente lo chiede esplicitamente.',
+    '- REGOLA FONDAMENTALE: non inventare mai. Se non sei sicuro, dillo chiaramente. Se la domanda è ambigua, fai prima una sola domanda breve per chiarire.',
+    useWeb
+      ? '- Per dati che cambiano nel tempo (fatturati, prezzi, leggi, tasse, scadenze, notizie) usa la ricerca web e indica sempre anno di riferimento e fonte.'
+      : '- La ricerca web non è disponibile: per dati che cambiano nel tempo indica l\'anno a cui si riferisce la tua conoscenza e avvisa che il dato potrebbe non essere aggiornato.',
+    act.length
+      ? `- Per i dati personali o aziendali dell'utente usa SOLO i documenti allegati (${act.join(', ')}). Cita il nome del documento da cui prendi il dato. Se il dato non c'è nei documenti, dillo: non stimarlo e non inventarlo.`
+      : '- L\'utente non ha documenti in uso: se chiede dati suoi (fatturato, fatture, bilanci), digli che non hai documenti e che può caricarli nella sezione Documenti.',
+    '- Se l\'utente ti chiede di preparare un messaggio o un prompt per Claude (o per altri), scrivilo chiaro e completo dentro un blocco di codice ``` così è pronto da copiare, preceduto da una sola frase.',
+    '- Niente tabelle. Usa elenchi solo se servono davvero. Non scrivere URL nel testo: le fonti vengono mostrate a parte.',
+    '- PANNELLO A LATO: se l\'utente ti chiede di scrivere qualcosa «a lato», di scriverglielo, di mostrarglielo o di metterlo per iscritto (per esempio un\'email, un indirizzo, un elenco, un testo da copiare), metti quel contenuto dentro <lato titolo="titolo breve">…</lato>. Fuori dal segno scrivi solo una frase breve da dire a voce, per esempio «Te l\'ho scritto a lato.». Non ripetere a voce il contenuto.',
+    '- PROMEMORIA: se l\'utente ti chiede di ricordare qualcosa («ricordati che…», «tieni a mente…», «segnati…»), scrivi <ricorda>la nota, breve e chiara</ricorda> e conferma a voce in poche parole. Se ti chiede di dimenticare qualcosa, scrivi <dimentica>la nota da togliere</dimentica>. Se ti chiede cosa ricordi o di mostrare i promemoria, scrivi <mostra_promemoria/> e riassumili a voce in breve. Se ti chiede di chiudere o togliere il pannello, scrivi <chiudi_lato/>.',
+    '- EMAIL: se l\'utente ti chiede di scrivere o mandare un\'email, preparala completa (saluto, testo, firma con il suo nome se lo conosci) dentro <email a="indirizzo del destinatario" oggetto="oggetto">testo</email>. Fuori dal segno di\' solo una frase breve, per esempio «Ho preparato l\'email per Mario: controllala a lato e premi Invia.». Non inventare mai l\'indirizzo: se non lo sai e non lo trovi, lascia a="" e chiedilo. Non dire mai che l\'email è stata inviata: la invia l\'utente premendo Invia.',
+    '- SQUADRA: hai due colleghi, «Email e clienti» (scrive le email) e «Project manager» (liste, piani, attività, scadenze, priorità). Se l\'utente ti chiede di chiedere o far fare qualcosa a uno di loro, o il lavoro è chiaramente loro, passaglielo con <chiama agente="pm">istruzione completa con tutto il contesto che serve</chiama> (agente="email" per l\'altro collega) e di\' a voce solo una frase breve, per esempio «Lo chiedo al Project manager.». La loro risposta arriva da sola a lato e nella Squadra: non inventarla tu.',
+    '- Non puoi leggere la casella di posta dell\'utente. Se ti chiede di cercare un\'email nella sua posta, diglielo; se intende l\'indirizzo email di un\'azienda o di una persona, cercalo sul web o nei documenti e indica la fonte; se non lo trovi, dillo.',
+    (() => { const m = Memory.all(); return m.length ? 'Cose che l\'utente ti ha chiesto di ricordare (usale quando servono):\n' + m.map(x => '- ' + x.text).join('\n') : ''; })()
+  ].filter(Boolean).join('\n');
+}
+
+function buildContents(question) {
+  const contents = historyWindow().map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+  const act = docs.filter(d => d.active);
+  if (act.length && contents.length) {
+    const parts = [{ text: `DOCUMENTI DELL'UTENTE (${act.length}). Usali come unica fonte per i suoi dati.` }];
+    for (const d of act) {
+      if (d.kind === 'inline') {
+        parts.push({ text: `=== Documento: ${d.name} ===` });
+        parts.push({ inline_data: { mime_type: d.mime, data: d.data } });
+      } else {
+        parts.push({ text: `=== Documento: ${d.name} ===\n${d.text}\n=== Fine documento: ${d.name} ===` });
+      }
+    }
+    parts.push({ text: 'DOMANDA:\n' + contents[contents.length - 1].parts[0].text });
+    contents[contents.length - 1].parts = parts;
+  }
+  return contents;
+}
+
+// registro tecnico dell'ultima domanda andata male (visibile in Impostazioni › Diagnostica)
+let diagLines = [];
+function logDiag(line) {
+  diagLines.push(line.replace(/key=[^&\s]+/g, 'key=…'));
+  LS.set('atlas.diag', { time: new Date().toLocaleString('it-IT'), lines: diagLines.slice(-12) });
+}
+// risposte veloci: poco "ragionamento" (le domande sono brevi e lette a voce)
+function thinkingFor(model) {
+  if (LS.get('atlas.nothink', []).includes(model)) return null;
+  const m = model.match(/gemini-(\d+(?:\.\d+)?)/), v = m ? parseFloat(m[1]) : (/latest/.test(model) ? 3 : 0);
+  if (v >= 3) return { thinkingLevel: 'low' };
+  if (v >= 2.5 && /flash/.test(model)) return { thinkingBudget: 0 };
+  return null;
+}
+class AIError extends Error { constructor(msg, code, info) { super(msg); this.code = code; this.info = info || {}; } }
+
+async function callGemini(contents, useWeb, model, opts = {}) {
+  const key = opts.key || settings.key;
+  // niente "temperature": i modelli Gemini 3 vanno lasciati al valore standard (altrimenti possono girare a vuoto)
+  const body = { contents, generationConfig: { maxOutputTokens: 2048 } };
+  const think = thinkingFor(model);
+  if (think) body.generationConfig.thinkingConfig = think;
+  if (!opts.noSystem) body.system_instruction = { parts: [{ text: opts.system || systemPrompt(useWeb) }] };
+  if (useWeb) body.tools = [{ google_search: {} }];
+  // con opts.onText la risposta arriva "in diretta", un pezzo alla volta (streaming)
+  const live = typeof opts.onText === 'function';
+  const limit = opts.timeout || 35000;
+  const ctrl = new AbortController();
+  let to = setTimeout(() => ctrl.abort(), limit);
+  const t0 = performance.now();
+  const endpoint = live ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+  let res;
+  try {
+    res = await fetch(`${API}/models/${encodeURIComponent(model)}:${endpoint}key=${encodeURIComponent(key)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal
+    });
+  } catch (e) {
+    clearTimeout(to);
+    if (e.name === 'AbortError') { logDiag(`${model} → nessuna risposta entro ${Math.round(limit / 1000)} s`); throw new AIError('Ci ho messo troppo a rispondere. Riprova, magari con una domanda più semplice.', 'timeout'); }
+    throw new AIError('Non riesco a collegarmi a internet. Controlla la connessione e riprova.', 'net');
+  }
+  const secsSince = () => ((performance.now() - t0) / 1000).toFixed(1).replace('.', ',');
+  if (!res.ok) {
+    clearTimeout(to);
+    let data = null;
+    try { data = await res.json(); } catch {}
+    const msg = (data && data.error && data.error.message) || '';
+    const reason = JSON.stringify((data && data.error && data.error.details) || '');
+    // modello che non accetta le impostazioni di "ragionamento": lo ricordo e riprovo senza
+    if (res.status === 400 && think && /thinking/i.test(msg)) {
+      const list = LS.get('atlas.nothink', []); if (!list.includes(model)) list.push(model); LS.set('atlas.nothink', list);
+      return callGemini(contents, useWeb, model, opts);
+    }
+    const det = (data && data.error && data.error.details) || [];
+    const viol = det.flatMap(d => d.violations || []);
+    const ids = viol.map(v => (v.quotaId || '') + ' ' + (v.quotaMetric || '')).join(' ');
+    // la parte utile del messaggio di Google è in fondo ("Quota exceeded for metric…, limit: …")
+    const tail = msg.replace(/You exceeded your current quota[\s\S]*?(?=\*|Quota exceeded|Please retry|$)/i, '').replace(/\s+/g, ' ').trim();
+    logDiag(`${model}${useWeb ? ' (con ricerca web)' : ''} → ${res.status} ${viol.map(v => (v.quotaId || '') + (v.quotaValue != null ? ' (limite ' + v.quotaValue + ')' : '')).join(', ')} ${(tail || msg).slice(0, 500)}`);
+    if (res.status === 429) {
+      // capisco quale limite è finito: al minuto, al giorno, o modello non gratuito (limite 0)
+      const retry = det.find(d => d.retryDelay) || ((msg.match(/retry in ([\d.]+)\s*s/i) || [])[1] ? { retryDelay: msg.match(/retry in ([\d.]+)\s*s/i)[1] } : null);
+      const info = {
+        project: viol.length > 0 && !/PerModel/i.test(ids),
+        kind: viol.some(v => String(v.quotaValue) === '0') || /limit:\s*0\b/.test(msg) ? 'zero'
+          : /PerDay/i.test(ids) || /per.?day|daily|requests_per_day/i.test(msg) ? 'day' : 'minute',
+        secs: retry ? Math.ceil(parseFloat(retry.retryDelay)) || 0 : 0,
+        tokens: /token/i.test(ids + ' ' + msg),
+        search: /search|ground/i.test(ids)
+      };
+      throw new AIError('quota', 'quota', info);
+    }
+    if (/API_KEY_INVALID|API key not valid|API key expired/i.test(msg + reason) || res.status === 401) throw new AIError('La chiave API non è valida. Apri le Impostazioni e incollala di nuovo, copiandola da aistudio.google.com.', 'key');
+    if (res.status === 403) throw new AIError('La chiave API non ha i permessi necessari. Creane una nuova su aistudio.google.com e inseriscila nelle Impostazioni.', 'key');
+    if (res.status === 404) throw new AIError('Il modello scelto non esiste più. Apri le Impostazioni, premi "Carica elenco" e salva.', 'model');
+    if (res.status === 413 || /payload|too large|exceeds|token count|request size/i.test(msg)) throw new AIError('I documenti in uso sono troppo grandi per una sola domanda. Apri Documenti e togli la spunta "in uso" a qualcuno.', 'size');
+    if (res.status === 400 && useWeb && /search|grounding|tool/i.test(msg)) throw new AIError(msg, 'noweb');
+    if (/location is not supported/i.test(msg)) throw new AIError('Il servizio non è disponibile dalla tua posizione attuale.', 'geo');
+    if (res.status >= 500) throw new AIError('Il servizio è momentaneamente sovraccarico. Riprova tra qualche secondo.', 'server');
+    throw new AIError(`Si è verificato un errore tecnico (codice ${res.status}). Trovi i dettagli nelle Impostazioni, alla voce Diagnostica.`, 'other');
+  }
+
+  // raccolgo il testo (in diretta o tutto insieme)
+  let text = '', grounding = null, finish = '', blocked = false, firstAt = '';
+  const absorb = data => {
+    if (data.promptFeedback && data.promptFeedback.blockReason) blocked = true;
+    const c = data.candidates && data.candidates[0];
+    if (!c) return;
+    const piece = ((c.content && c.content.parts) || []).filter(p => p.text && !p.thought).map(p => p.text).join('');
+    if (piece) { if (!text) firstAt = secsSince(); text += piece; }
+    if (c.groundingMetadata) grounding = c.groundingMetadata;
+    if (c.finishReason) finish = c.finishReason;
+  };
+  if (live && res.body && res.body.getReader) {
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        // ogni pezzo ricevuto allunga il tempo a disposizione
+        clearTimeout(to); to = setTimeout(() => ctrl.abort(), 20000);
+        buf += dec.decode(value, { stream: true });
+        let m;
+        while ((m = buf.match(/\r?\n\r?\n/))) {
+          const block = buf.slice(0, m.index); buf = buf.slice(m.index + m[0].length);
+          const json = block.split(/\r?\n/).filter(l => l.startsWith('data:')).map(l => l.slice(5).trim()).join('');
+          if (!json) continue;
+          let d; try { d = JSON.parse(json); } catch { continue; }
+          const before = text.length;
+          absorb(d);
+          if (text.length > before) opts.onText(text);
+        }
+      }
+      const rest = buf.split(/\r?\n/).filter(l => l.startsWith('data:')).map(l => l.slice(5).trim()).join('');
+      if (rest) { try { const before = text.length; absorb(JSON.parse(rest)); if (text.length > before) opts.onText(text); } catch {} }
+    } catch (e) {
+      // connessione interrotta a metà: se ho già del testo lo tengo
+      if (!text) {
+        clearTimeout(to);
+        if (e.name === 'AbortError') { logDiag(`${model} → nessuna risposta entro ${Math.round(limit / 1000)} s`); throw new AIError('Ci ho messo troppo a rispondere. Riprova, magari con una domanda più semplice.', 'timeout'); }
+        throw new AIError('Non riesco a collegarmi a internet. Controlla la connessione e riprova.', 'net');
+      }
+    }
+  } else {
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (Array.isArray(data)) data.forEach(absorb); else if (data) absorb(data);
+    if (live && text) opts.onText(text);
+  }
+  clearTimeout(to);
+  text = text.trim();
+  logDiag(`${model}${useWeb ? ' (con ricerca web)' : ''} → ${firstAt && live ? `prima frase in ${firstAt} s, ` : ''}risposta completa in ${secsSince()} s`);
+  if (!text) {
+    if (blocked || finish === 'SAFETY') throw new AIError('Non posso rispondere a questa domanda per motivi di sicurezza. Prova a riformularla.', 'blocked');
+    throw new AIError('Non ho ricevuto nessuna risposta. Riprova.', 'empty');
+  }
+  const sources = [], seen = new Set();
+  const chunks = (grounding && grounding.groundingChunks) || [];
+  for (const c of chunks) {
+    const w = c.web; if (!w || !w.uri) continue;
+    const key = (w.title || w.uri).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push({ uri: w.uri, title: w.title || new URL(w.uri).hostname });
+    if (sources.length >= 8) break;
+  }
+  return { text, sources };
+}
+
+async function fetchModels(key) {
+  let res;
+  const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 20000);
+  try { res = await fetch(`${API}/models?pageSize=1000&key=${encodeURIComponent(key)}`, { signal: ctrl.signal }); }
+  catch { throw new AIError('Non riesco a collegarmi a internet. Controlla la connessione.', 'net'); }
+  finally { clearTimeout(to); }
+  let data = null; try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const msg = (data && data.error && data.error.message) || '';
+    logDiag(`elenco modelli → ${res.status} ${msg.slice(0, 220)}`);
+    if (res.status === 400 || res.status === 401 || res.status === 403 || /API key/i.test(msg)) throw new AIError('La chiave API non è valida. Controlla di averla copiata tutta.', 'key');
+    if (res.status === 429) throw new AIError('Ho raggiunto il limite del piano gratuito. Riprova tra un minuto.', 'quota');
+    throw new AIError('Impossibile scaricare l\'elenco dei modelli: ' + (msg || res.status), 'other');
+  }
+  LS.set('atlas.ttsmodels', ((data && data.models) || []).map(m => m.name.replace(/^models\//, '')).filter(id => /tts/i.test(id)));
+  return ((data && data.models) || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => ({ id: m.name.replace(/^models\//, ''), label: m.displayName || m.name }))
+    .filter(m => /gemini|gemma/i.test(m.id) && !/(embed|aqa|tts|image|audio|live|native|computer|robotics|veo|imagen)/i.test(m.id));
+}
+function pickFlash(models) {
+  const ids = models.map(m => m.id);
+  const ver = id => { const m = id.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+  const flash = ids.filter(id => /flash/i.test(id));
+  const stable = id => !/(preview|exp|latest|\d{3,})/i.test(id);
+  const byVer = arr => arr.slice().sort((a, b) => ver(b) - ver(a) || a.length - b.length);
+  return ids.find(id => id === 'gemini-flash-latest')
+    || byVer(flash.filter(id => stable(id) && !/lite/i.test(id)))[0]
+    || byVer(flash.filter(id => !/lite/i.test(id)))[0]
+    || byVer(flash)[0]
+    || ids[0] || '';
+}
+function sortModels(models) {
+  return models.slice().sort((a, b) => (/flash/i.test(b.id) - /flash/i.test(a.id)) || b.id.localeCompare(a.id));
+}
+
+// modelli che hanno finito le domande gratuite di oggi (il limite Google si azzera a mezzanotte del Pacifico)
+const quotaDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+function exhausted() { const e = LS.get('atlas.exhausted', null); return e && e.day === quotaDay() ? e.models : []; }
+function unmarkExhausted(m) { const list = exhausted().filter(x => x !== m); LS.set('atlas.exhausted', { day: quotaDay(), models: list }); }
+function markExhausted(m) { const list = exhausted(); if (!list.includes(m)) list.push(m); LS.set('atlas.exhausted', { day: quotaDay(), models: list }); }
+// ordine di preferenza dei modelli gratuiti: prima "flash", poi "flash-lite"
+function rankModels(ids) {
+  const ver = id => { const m = id.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+  // prima i flash, dalla versione più recente; per ogni versione prima "flash" e poi "flash-lite"
+  const group = id => (/flash/i.test(id) ? 0 : 1000) + (/preview|exp/i.test(id) ? 100 : 0);
+  return ids.filter(id => /^gemini/i.test(id) && !/pro|ultra/i.test(id))
+    .sort((a, b) => group(a) - group(b) || ver(b) - ver(a) || /lite/i.test(a) - /lite/i.test(b));
+}
+async function nextModel(tried) {
+  let models = modelCache;
+  if (!models.length) { try { models = await fetchModels(settings.key); modelCache = models; LS.set('atlas.models', models); } catch { return ''; } }
+  const ex = exhausted();
+  // solo modelli stabili: le versioni "preview" spesso non sono gratuite
+  const free = rankModels(models.map(m => m.id).filter(id => !/preview|exp/i.test(id))).filter(id => !tried.has(id) && !ex.includes(id));
+  // se non ho ancora provato un "flash-lite" (di solito ha molte più domande gratuite), lo provo subito
+  if (![...tried].some(id => /lite/i.test(id))) { const lite = free.find(id => /lite/i.test(id)); if (lite) return lite; }
+  return free[0] || '';
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const noSearchToday = () => LS.get('atlas.nosearch', '') === quotaDay();
+async function generate(contents, onText, system) {
+  let useWeb = settings.web && !noSearchToday(), waited = false, last = null, searchTested = false;
+  const tried = new Set();
+  let model = exhausted().includes(settings.model) ? (await nextModel(tried)) || settings.model : settings.model;
+  const start = Date.now();
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (attempt > 0 && Date.now() - start > 70000) break;   // non faccio aspettare più di così
+    try { return await callGemini(contents, useWeb, model, { onText, system }); }
+    catch (err) {
+      let e = err;
+      last = e;
+      if (e.code === 'noweb' && useWeb) { useWeb = false; continue; }
+      if (e.code === 'quota') {
+        const q = e.info;
+        // la ricerca web ha un limite suo: se è quello finito, rispondo senza ricerca
+        if (useWeb && (q.search || !searchTested)) {
+          searchTested = true;
+          try {
+            const out = await callGemini(contents, false, model, { onText, system });
+            LS.set('atlas.nosearch', quotaDay());
+            logDiag('Ricerca web non disponibile oggi: rispondo senza.');
+            return out;
+          } catch (e2) {
+            if (!['quota', 'server', 'timeout'].includes(e2.code)) throw e2;
+            last = e = e2;                          // non era (solo) la ricerca: proseguo con il cambio di modello
+          }
+        }
+        const q2 = e.info || {};
+        if (e.code !== 'quota') { /* sovraccarico o troppo lento: cambio modello */ }
+        else if (q2.project) break;                      // limite di tutto l'account: cambiare modello non serve
+        else if (q2.kind === 'minute' && !waited && q2.secs > 0 && q2.secs <= 12) { waited = true; await sleep(q2.secs * 1000 + 300); continue; }
+        else if (q2.kind !== 'minute') markExhausted(model);
+      } else if (e.code === 'server') {
+        // modello sovraccarico: passo subito a un altro (di solito i "lite" sono più liberi)
+      } else if (e.code === 'timeout') {
+        // troppo lento: provo una volta un modello più leggero, poi mi arrendo
+        if (tried.has('__slow')) throw e;
+        tried.add('__slow');
+      } else if (e.code === 'model') {
+        try { modelCache = await fetchModels(settings.key); LS.set('atlas.models', modelCache); } catch {}
+      } else throw e;
+      tried.add(model);
+      if (tried.size >= 6) break;
+      const next = await nextModel(tried);
+      if (!next) break;
+      if (e.code === 'model' && !modelCache.some(m => m.id === settings.model)) { settings.model = next; saveSettings(); }
+      model = next;
+    }
+  }
+  if (last && last.code === 'quota') {
+    const q = last.info;
+    if (q.kind === 'minute') {
+      if (q.tokens) throw new AIError('I documenti in uso sono troppo pesanti per il piano gratuito. Disattiva qualche documento oppure aspetta un minuto.', 'quota');
+      throw new AIError(`Mi hai fatto troppe domande in poco tempo per il piano gratuito. Riprova tra ${q.secs > 0 ? q.secs + ' secondi' : 'un minuto'}.`, 'quota');
+    }
+    throw new AIError('Ho finito le domande gratuite di oggi. Il limite si azzera ogni giorno verso le 9 del mattino.', 'quota');
+  }
+  if (last && last.code !== 'noweb') throw last;
+  throw new AIError('Non riesco a rispondere in questo momento. Riprova tra poco.', 'other');
+}
+
+/* ================= Claude (motore principale) ================= */
+// SDK ufficiale Anthropic, caricato da CDN (versione fissata)
+const CLAUDE_SDK = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.132.1/+esm';
+const CLAUDE_NAMES = { 'claude-haiku-5-5': 'Haiku 5.5', 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-opus-5-5': 'Opus 5.5' };
+// prezzi di listino in dollari per milione di token [ingresso, uscita]; ricerca web: 10 $ ogni 1.000
+const CLAUDE_PRICES = { 'claude-haiku-5-5': [0.10, 0.50], 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20] };
+const hasKey = () => !!(settings.claudeKey || settings.key);
+let sdkMod = null;
+const claudeClients = {};
+async function claudeClient(key) {
+  if (!sdkMod) {
+    try { sdkMod = await import(CLAUDE_SDK); }
+    catch { throw new AIError('Non riesco a collegarmi a Claude. Controlla la connessione a internet.', 'net'); }
+  }
+  if (!claudeClients[key]) {
+    const Anthropic = sdkMod.default || sdkMod.Anthropic;
+    claudeClients[key] = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 45000 });
+  }
+  return claudeClients[key];
+}
+
+// ultimi messaggi della conversazione (senza domande rimaste senza risposta)
+function historyWindow() {
+  const all = chat.filter(m => !m.error);
+  const clean = all.filter((m, i) => !(m.role === 'user' && all[i + 1] && all[i + 1].role === 'user'));
+  const hist = clean.slice(-HISTORY);
+  while (hist.length && hist[0].role !== 'user') hist.shift();
+  return hist;
+}
+const CLAUDE_IMAGES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+function buildClaudeMessages() {
+  const msgs = historyWindow().map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+  const act = docs.filter(d => d.active);
+  if (act.length && msgs.length) {
+    const last = msgs[msgs.length - 1];
+    const content = [{ type: 'text', text: `DOCUMENTI DELL'UTENTE (${act.length}). Usali come unica fonte per i suoi dati.` }];
+    for (const d of act) {
+      if (d.kind === 'inline' && d.mime === 'application/pdf') {
+        content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: d.data }, title: d.name });
+      } else if (d.kind === 'inline' && CLAUDE_IMAGES.includes(d.mime)) {
+        content.push({ type: 'text', text: `=== Documento: ${d.name} (foto) ===` });
+        content.push({ type: 'image', source: { type: 'base64', media_type: d.mime, data: d.data } });
+      } else if (d.kind === 'inline') {
+        content.push({ type: 'text', text: `=== Documento: ${d.name} === (foto in un formato che non riesco a leggere: va salvata come JPG o PNG)` });
+      } else {
+        content.push({ type: 'text', text: `=== Documento: ${d.name} ===\n${d.text}\n=== Fine documento: ${d.name} ===` });
+      }
+    }
+    content.push({ type: 'text', text: 'DOMANDA:\n' + last.content });
+    last.content = content;
+  }
+  return msgs;
+}
+
+function claudeError(e, model) {
+  if (e instanceof AIError) return e;
+  const st = e && e.status;
+  const msg = (e && e.error && e.error.error && e.error.error.message) || (e && e.message) || '';
+  logDiag(`Claude ${CLAUDE_NAMES[model] || model} → ${st || (e && e.name) || 'errore'} ${String(msg).slice(0, 300)}`);
+  if (!st) {
+    if (/timeout/i.test((e && e.name) + msg)) return new AIError('Ci ho messo troppo a rispondere. Riprova tra poco.', 'timeout');
+    return new AIError('Non riesco a collegarmi a Claude. Controlla la connessione a internet.', 'net');
+  }
+  if (st === 401) return new AIError('La chiave di Claude non è valida. Copiala di nuovo da console.anthropic.com e incollala nelle Impostazioni.', 'key');
+  if (st === 403) return new AIError('La chiave di Claude non ha i permessi necessari. Creane una nuova su console.anthropic.com.', 'key');
+  if (st === 400 && /credit balance|billing|purchase credits/i.test(msg)) return new AIError('Il credito di Claude è finito. Puoi ricaricarlo su console.anthropic.com.', 'credit');
+  if (st === 400 && /web_search|tool/i.test(msg)) return new AIError(msg, 'noweb');
+  if (st === 404) return new AIError('Il modello Claude scelto non è disponibile. Scegline un altro nelle Impostazioni.', 'model');
+  if (st === 413 || /too large|too long|exceeds|maximum/i.test(msg)) return new AIError('I documenti in uso sono troppo grandi per una sola domanda. Apri Documenti e togli la spunta "in uso" a qualcuno.', 'size');
+  if (st === 429) return new AIError('Ho ricevuto troppe domande in poco tempo. Riprova tra un minuto.', 'rate');
+  if (st === 529 || st >= 500) return new AIError('Il servizio è momentaneamente sovraccarico. Riprova tra qualche secondo.', 'server');
+  return new AIError(`Si è verificato un errore tecnico (codice ${st}). Trovi i dettagli nelle Impostazioni, alla voce Diagnostica.`, 'other');
+}
+
+// spesa stimata del mese su questo dispositivo
+function addSpend(usd) {
+  const month = new Date().toISOString().slice(0, 7);
+  const sp = LS.get('atlas.spend', { month, usd: 0 });
+  if (sp.month !== month) { sp.month = month; sp.usd = 0; }
+  sp.usd += usd;
+  LS.set('atlas.spend', sp);
+}
+function spendText() {
+  const month = new Date().toISOString().slice(0, 7), sp = LS.get('atlas.spend', null);
+  const usd = sp && sp.month === month ? sp.usd : 0;
+  return `Spesa stimata di questo mese su questo dispositivo: circa ${usd.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} $ (il conto esatto è su console.anthropic.com).`;
+}
+
+async function callClaude(onText, opts = {}) {
+  const key = opts.key || settings.claudeKey;
+  const model = opts.model || settings.claudeModel || 'claude-haiku-5-5';
+  const client = await claudeClient(key);
+  let useWeb = opts.useWeb !== undefined ? opts.useWeb : settings.web;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const params = { model, max_tokens: 4096, output_config: { effort: 'low' }, messages: opts.messages || buildClaudeMessages() };
+    if (!opts.noSystem) params.system = opts.system || systemPrompt(useWeb);
+    if (useWeb) params.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2, user_location: { type: 'approximate', country: 'IT', timezone: 'Europe/Rome' } }];
+    const t0 = performance.now(), secs = () => ((performance.now() - t0) / 1000).toFixed(1).replace('.', ',');
+    let acc = '', gap = false, firstAt = '', msg;
+    try {
+      const stream = client.messages.stream(params);
+      for await (const ev of stream) {
+        if (ev.type === 'content_block_start' && ev.content_block && ev.content_block.type !== 'text' && ev.content_block.type !== 'thinking') gap = true;
+        if (onText && ev.type === 'content_block_start' && ev.content_block && ev.content_block.type === 'web_search_tool_result' && Array.isArray(ev.content_block.content)) {
+          const hosts = [...new Set(ev.content_block.content.map(r => { try { return new URL(r.url).hostname.replace(/^www\./, ''); } catch { return ''; } }).filter(Boolean))];
+          setWebLabels(hosts);
+        }
+        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && ev.delta.text) {
+          if (gap && acc && !/\s$/.test(acc)) acc += ' ';   // testo prima e dopo una ricerca web
+          gap = false;
+          if (!acc) firstAt = secs();
+          acc += ev.delta.text;
+          if (onText) onText(acc);
+        }
+      }
+      msg = await stream.finalMessage();
+    } catch (e) {
+      const err = claudeError(e, model);
+      if (err.code === 'noweb' && useWeb && !acc) { useWeb = false; continue; }
+      if (acc) break;                         // risposta interrotta a metà: tengo quello che è arrivato
+      if (err.code === 'noweb') throw new AIError('Si è verificato un errore tecnico. Trovi i dettagli nelle Impostazioni, alla voce Diagnostica.', 'other');
+      throw err;
+    }
+    const text = acc.trim();
+    // costo stimato
+    const u = (msg && msg.usage) || {};
+    const tin = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), tout = u.output_tokens || 0;
+    const searches = (u.server_tool_use && u.server_tool_use.web_search_requests) || 0;
+    const pr = CLAUDE_PRICES[model] || CLAUDE_PRICES['claude-haiku-5-5'];
+    const big = model === 'claude-haiku-5-5' && tin > 100000 ? 5 : 1;    // Haiku oltre 100K token costa 5 volte
+    const usd = (tin * pr[0] * big + tout * pr[1] * big) / 1e6 + searches * 0.01;
+    addSpend(usd);
+    logDiag(`Claude ${CLAUDE_NAMES[model] || model}${useWeb ? ' (con ricerca web)' : ''} → ${firstAt ? `prima frase in ${firstAt} s, ` : ''}risposta completa in ${secs()} s · token ${tin} in / ${tout} out · ricerche ${searches} · ≈ ${(usd * 100).toFixed(3).replace('.', ',')} centesimi di $`);
+    if (!text) {
+      if (msg && msg.stop_reason === 'refusal') throw new AIError('Non posso rispondere a questa domanda. Prova a riformularla.', 'blocked');
+      throw new AIError('Non ho ricevuto nessuna risposta. Riprova.', 'empty');
+    }
+    // fonti: prima quelle citate nella risposta, poi i risultati della ricerca
+    const cited = [], found = [];
+    for (const b of (msg && msg.content) || []) {
+      if (b.type === 'text' && Array.isArray(b.citations)) b.citations.forEach(c => c.url && cited.push({ uri: c.url, title: c.title }));
+      if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) b.content.forEach(r => r.url && found.push({ uri: r.url, title: r.title }));
+    }
+    const sources = [], seen = new Set();
+    for (const s of cited.length ? cited : found.slice(0, 5)) {
+      let host = ''; try { host = new URL(s.uri).hostname.replace(/^www\./, ''); } catch {}
+      if (seen.has(s.uri) || seen.has(host)) continue;
+      seen.add(s.uri); seen.add(host);
+      sources.push({ uri: s.uri, title: host || s.title || s.uri });
+      if (sources.length >= 6) break;
+    }
+    return { text, sources };
+  }
+  throw new AIError('Non ho ricevuto nessuna risposta. Riprova.', 'empty');
+}
+
+// Claude prima; se non risponde (credito finito, rete, sovraccarico) passo alla riserva gratuita
+async function answer(question, onText, started) {
+  if (settings.claudeKey) {
+    try { const out = await callClaude(onText); setAlert('credit', false); setAlert('key', false); return out; }
+    catch (e) {
+      if (e.code === 'credit' || e.code === 'key') setAlert(e.code, true);
+      if (started() || !settings.key || ['blocked', 'size'].includes(e.code)) throw e;
+      logDiag(`Claude non disponibile (${e.code}): uso la riserva gratuita.`);
+      if (e.code === 'credit') toast('Il credito di Claude è finito: per ora rispondo con la riserva gratuita. Puoi ricaricarlo su console.anthropic.com.', 10000);
+      if (e.code === 'key') toast('La chiave di Claude non funziona: per ora rispondo con la riserva gratuita. Controllala nelle Impostazioni.', 10000);
+    }
+  }
+  if (!settings.model) {
+    settings.model = pickFlash(await fetchModels(settings.key));
+    saveSettings();
+    if (!settings.model) throw new AIError('Non trovo nessun modello disponibile per questa chiave.', 'model');
+  }
+  const out = await generate(buildContents(question), onText);
+  setAlert('quota', false);
+  return out;
+}
+
+// stesso motore di Jarvis, con istruzioni e conversazione a scelta (usato dagli agenti della Squadra)
+async function llm({ system, msgs, onText }) {
+  if (settings.claudeKey) {
+    try { return await callClaude(onText, { system, messages: msgs.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })) }); }
+    catch (e) { if (!settings.key || ['blocked', 'size'].includes(e.code)) throw e; logDiag(`Squadra: Claude non disponibile (${e.code}), uso la riserva.`); }
+  }
+  if (!settings.key) throw new AIError('Manca una chiave API: aggiungila nelle Impostazioni.', 'key');
+  if (!settings.model) { settings.model = pickFlash(await fetchModels(settings.key)); saveSettings(); }
+  return generate(msgs.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), onText, system);
+}
+
+let busy = false;
+async function ask(question) {
+  question = String(question || '').trim();
+  if (!question || busy) return;
+  if (!hasKey()) { openPanel('settings'); return; }
+  busy = true;
+  pauseListening();
+  TTS.stop();
+  diagLines = [];
+  setWebLabels([]);
+  { const act = docs.filter(d => d.active), l = activeLoad();
+    logDiag(`Documenti in uso: ${act.length}${act.length ? ` (${fmtSize(l.bytes)}, circa ${Math.round(l.chars / 4000)}k token di testo${act.some(d => d.kind === 'inline') ? ' + PDF/foto' : ''}): ${act.map(d => d.name).join(', ')}` : ''}`); }
+  addMsg({ role: 'user', text: question, ts: Date.now() });
+  bumpStats(1, 0);
+  setState('thinking');
+  let out = null, err = null, partial = '', liveEl = null, voice = null, sideShown = false;
+  // la risposta arriva un pezzo alla volta: la leggo subito e (se la chat è aperta) la scrivo mentre arriva
+  const onText = text => {
+    partial = text;
+    if (settings.speak && window.speechSynthesis) { if (!voice) voice = TTS.live(); voice.update(speakable(text)); }
+    if (!sideShown && /<\/lato>/i.test(text)) { const tg = parseTags(text); if (tg.side) { sideShown = true; Side.open({ note: tg.side }); } }
+    if (appEl.classList.contains('textmode')) {
+      if (!liveEl) { liveEl = document.createElement('div'); liveEl.className = 'msg ai'; chatEl.appendChild(liveEl); }
+      liveEl.innerHTML = renderMd(text);
+      scrollChat();
+    }
+  };
+  try {
+    if (docsTooBig()) throw new AIError('I documenti in uso sono troppo grandi per una sola domanda. Apri Documenti e togli la spunta "in uso" a qualcuno.', 'size');
+    out = await answer(question, onText, () => !!partial);
+  } catch (e) {
+    err = e instanceof AIError ? e.message : 'Si è verificato un errore imprevisto: ' + (e && e.message || e);
+    if (e && e.code === 'quota' && !settings.claudeKey) setAlert('quota', true);
+  }
+  busy = false;
+  if (liveEl) { liveEl.remove(); liveEl = null; }
+  if (err && !partial) { showError(err); return; }
+  if (!out) out = { text: partial, sources: [] };     // interrotta a metà: tengo quello che è arrivato
+  // pannello a lato e promemoria
+  const tg = parseTags(out.text);
+  tg.remember.forEach(r => Memory.add(r));
+  tg.forget.forEach(f => Memory.forget(f));
+  const saved = tg.clean + (tg.email ? `\n\n**Email per ${tg.email.to || '(destinatario da indicare)'}** — ${tg.email.subject}\n\n${tg.email.body}` : '') + (tg.side ? `\n\n**${tg.side.title}**\n\n${tg.side.body}` : '') + (tg.remember.length ? `\n\n_Da ricordare: ${tg.remember.join('; ')}_` : '');
+  addMsg({ role: 'model', text: saved || tg.clean || '…', sources: out.sources, ts: Date.now() });
+  bumpStats(0, out.sources.length);
+  if (out.sources.length) setWebLabels(out.sources.map(x => x.title));
+  if (tg.email) Side.open({ email: tg.email, note: tg.side, highlight: tg.remember });
+  else if (tg.closeSide) Side.close();
+  else if (tg.side) Side.open({ note: tg.side, highlight: tg.remember });
+  else if (tg.remember.length || tg.forget.length || tg.showMem) Side.open({ highlight: tg.remember });
+  else Side.refresh();
+  // lavoro passato ai colleghi della Squadra: rispondono nel gruppo e la risposta arriva a lato
+  const calls = Team.calls(out.text);
+  if (calls.length) Team.delegate(question, speakable(out.text).trim(), calls);
+  // se a voce non c'è niente da dire, una frase breve
+  const spoken = speakable(out.text).trim() || (calls.length ? `Lo chiedo ${calls.map(c => c.id === 'pm' ? 'al Project manager' : 'a Email e clienti').join(' e ')}.` : '') || (tg.email ? 'Ho preparato l\'email: controllala a lato e premi Invia.' : tg.side ? 'Te l\'ho scritto a lato.' : tg.remember.length ? 'Va bene, me lo ricordo.' : tg.forget.length ? 'Fatto, l\'ho dimenticato.' : '');
+  if (voice) voice.finish(speakable(out.text).trim() ? speakable(out.text) : spoken);
+  else { showChat(); setState('idle'); }
+}
+
+/* ================= Pannelli ================= */
+const panels = { docs: $('#panelDocs'), settings: $('#panelSettings'), team: $('#panelTeam') };
+function openPanel(name) {
+  pauseListening();
+  closeComposer();
+  if (name === 'settings') fillSettings();
+  if (name === 'docs') renderDocs();
+  if (name === 'team') Team.render();
+  const p = panels[name];
+  p.classList.add('open'); p.setAttribute('aria-hidden', 'false');
+}
+function closePanel(p) { p.classList.remove('open'); p.setAttribute('aria-hidden', 'true'); setTimeout(resumeWake, 300); }
+Object.values(panels).forEach(p => p.querySelector('[data-close]').addEventListener('click', () => closePanel(p)));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { Object.values(panels).forEach(closePanel); if (Side.isOpen()) Side.close(); } });
+$('#btnDocs').addEventListener('click', () => openPanel('docs'));
+$('#btnTeam').addEventListener('click', () => openPanel('team'));
+$('#btnSettings').addEventListener('click', () => openPanel('settings'));
+
+/* ================= Impostazioni ================= */
+let modelCache = LS.get('atlas.models', []);
+function fillModelSelect(models, selected) {
+  const sel = $('#sModel');
+  const list = sortModels(models);
+  if (selected && !list.some(m => m.id === selected)) list.unshift({ id: selected, label: selected });
+  sel.innerHTML = list.length
+    ? list.map(m => `<option value="${esc(m.id)}"${m.id === selected ? ' selected' : ''}>${esc(m.id)}</option>`).join('')
+    : '<option value="">Premi "Carica elenco"</option>';
+}
+function fillDiag() {
+  const dg = LS.get('atlas.diag', null);
+  $('#diagBox').textContent = dg && dg.lines.some(l => /→/.test(l))
+    ? dg.time + '\n' + dg.lines.join('\n') + '\nMotore: ' + (settings.claudeKey ? 'Claude ' + (CLAUDE_NAMES[settings.claudeModel] || settings.claudeModel) + ' · riserva: ' + (settings.key ? settings.model || '—' : 'nessuna') : (settings.model || '—')) + '\nEsauriti oggi: ' + (exhausted().join(', ') || 'nessuno') + '\nRicerca web oggi: ' + (noSearchToday() ? 'non disponibile' : 'disponibile')
+    : 'Nessun errore registrato.';
+}
+function fillSettings() {
+  $('#sName').value = settings.name;
+  $('#sKey').value = settings.key;
+  $('#sClaudeKey').value = settings.claudeKey || '';
+  $('#sVoiceEngine').value = settings.voiceEngine || 'device'; $('#sGVoice').value = settings.gVoice || 'Charon'; $('#gVoiceBox').hidden = $('#sVoiceEngine').value !== 'google';
+  $('#sEjService').value = settings.ejService || ''; $('#sEjTemplate').value = settings.ejTemplate || ''; $('#sEjKey').value = settings.ejKey || ''; $('#sMyEmail').value = settings.myEmail || ''; $('#ejMsg').textContent = '';
+  $('#sRate').value = settings.rate || 1.03; $('#sPitch').value = settings.pitch || 1; showSliders();
+  $('#sClaudeModel').value = settings.claudeModel || 'claude-haiku-5-5';
+  $('#spendMsg').textContent = settings.claudeKey ? spendText() : '';
+  $('#sProfile').value = settings.profile;
+  $('#sWeb').checked = !!settings.web;
+  $('#sSpeak').checked = !!settings.speak;
+  $('#sWake').checked = !!settings.wake;
+  $('#savedMsg').textContent = '';
+  $('#modelMsg').textContent = '';
+  $('#checkOut').innerHTML = '';
+  fillDiag();
+  fillModelSelect(modelCache, settings.model);
+  TTS.load();
+  TTS.fillSelect(settings.voice || undefined);
+}
+async function loadModelList() {
+  const key = $('#sKey').value.trim();
+  const msg = $('#modelMsg'), btn = $('#btnModels');
+  if (!key) { msg.textContent = 'Inserisci prima la chiave API.'; return null; }
+  btn.disabled = true; msg.textContent = 'Carico l\'elenco…';
+  try {
+    const models = await fetchModels(key);
+    modelCache = models; LS.set('atlas.models', models);
+    const cur = $('#sModel').value;
+    const choice = models.some(m => m.id === cur) && cur ? cur : pickFlash(models);
+    fillModelSelect(models, choice);
+    msg.textContent = `${models.length} modelli disponibili. Preselezionato: ${choice}.`;
+    return choice;
+  } catch (e) {
+    msg.textContent = e.message;
+    return null;
+  } finally { btn.disabled = false; }
+}
+$('#btnModels').addEventListener('click', loadModelList);
+
+// ---- verifica: provo la chiave su alcuni modelli e scelgo il primo che funziona ----
+function reasonText(e) {
+  if (!(e instanceof AIError)) return 'errore imprevisto';
+  if (e.code === 'quota') {
+    const q = e.info;
+    if (q.kind === 'zero') return 'non incluso nel piano gratuito';
+    if (q.kind === 'day') return 'domande gratuite di oggi finite';
+    if (q.project) return "limite dell'intero account raggiunto";
+    return q.tokens ? 'troppo testo in questo minuto' : 'troppe richieste in questo minuto' + (q.secs ? ` (riprova tra ${q.secs} s)` : '');
+  }
+  if (e.code === 'key') return 'chiave non valida';
+  if (e.code === 'model') return 'modello non disponibile';
+  if (e.code === 'net') return 'nessuna connessione';
+  if (e.code === 'timeout') return 'nessuna risposta in tempo';
+  if (e.code === 'noweb') return 'ricerca web non supportata';
+  return e.message;
+}
+async function checkKey() {
+  const key = $('#sKey').value.trim(), out = $('#checkOut'), btn = $('#btnCheck');
+  if (!key) { out.innerHTML = '<div class="sum">Inserisci prima la chiave API.</div>'; return; }
+  btn.disabled = true;
+  out.innerHTML = '<div class="sum">Controllo in corso… può volerci mezzo minuto.</div>';
+  diagLines = [];
+  const row = (ok, model, text) => { out.insertAdjacentHTML('beforeend', `<div class="r"><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✕'}</span><span><b>${esc(model)}</b> — ${esc(text)}</span></div>`); };
+  let models;
+  try { models = await fetchModels(key); }
+  catch (e) { out.innerHTML = `<div class="sum">${esc(e.message)}</div>`; btn.disabled = false; return; }
+  modelCache = models; LS.set('atlas.models', models);
+  const stable = rankModels(models.map(m => m.id).filter(id => !/preview|exp/i.test(id)));
+  const firstLite = stable.find(id => /lite/i.test(id));
+  const order = [...new Set([$('#sModel').value, stable[0], firstLite, ...stable].filter(Boolean))].slice(0, 5);
+  const tiny = [{ role: 'user', parts: [{ text: 'Rispondi solo con la parola: ok' }] }];
+  out.innerHTML = '';
+  let firstOk = '';
+  const fails = [];
+  for (const m of order) {
+    try { await callGemini(tiny, false, m, { key, noSystem: true }); row(true, m, 'funziona'); firstOk = m; unmarkExhausted(m); break; }
+    catch (e) {
+      if (e.code === 'empty') { row(true, m, 'funziona'); firstOk = m; break; }
+      fails.push(e); row(false, m, reasonText(e));
+      if (e.code === 'quota' && (e.info.kind === 'day' || e.info.kind === 'zero')) markExhausted(m);
+      if (e.code === 'key' || e.code === 'net') break;
+    }
+    await sleep(300);
+  }
+  let sum;
+  if (firstOk) {
+    let web;
+    try { await callGemini([{ role: 'user', parts: [{ text: 'Che giorno è oggi? Cerca sul web e rispondi in una frase.' }] }], true, firstOk, { key, noSystem: true }); web = true; LS.set('atlas.nosearch', ''); }
+    catch (e) { web = e.code === 'empty'; if (!web) row(false, 'ricerca web', reasonText(e)); }
+    if (web) row(true, 'ricerca web', 'funziona');
+    fillModelSelect(modelCache, firstOk);
+    settings.key = key; settings.model = firstOk; saveSettings();
+    sum = `Tutto a posto: ho scelto e salvato <b>${esc(firstOk)}</b>, il primo modello che funziona.` + (web ? '' : ' La ricerca web oggi non è disponibile: risponderò senza, avvisando quando un dato potrebbe non essere aggiornato.');
+  } else if (fails.some(e => e.code === 'key')) sum = 'La chiave non è valida: copiala di nuovo da aistudio.google.com (tutta, senza spazi) e riprova.';
+  else if (fails.length && fails.every(e => e.code === 'quota' && e.info.kind === 'day')) sum = 'Le domande gratuite di oggi sono finite su tutti i modelli provati. Il limite si azzera ogni giorno verso le 9 del mattino.';
+  else if (fails.length && fails.every(e => e.code === 'quota' && e.info.kind === 'zero')) sum = 'Questa chiave non ha accesso al piano gratuito. Su aistudio.google.com crea una nuova chiave con "Create API key in new project" e riprova.';
+  else if (fails.length && fails.every(e => e.code === 'quota')) sum = 'Google sta rifiutando tutte le richieste di questa chiave per i limiti del piano gratuito. Controlla i tuoi limiti su aistudio.google.com/usage oppure riprova tra qualche minuto.';
+  else sum = 'Nessun modello ha risposto. Trovi i dettagli tecnici qui sotto, nella Diagnostica.';
+  out.insertAdjacentHTML('afterbegin', `<div class="sum">${sum}</div>`);
+  fillDiag();
+  btn.disabled = false;
+}
+async function checkAll() {
+  const out = $('#checkOut'), btn = $('#btnCheck');
+  const ck = $('#sClaudeKey').value.trim(), gk = $('#sKey').value.trim();
+  if (!ck && !gk) { out.innerHTML = '<div class="sum">Inserisci prima una chiave API.</div>'; return; }
+  diagLines = [];
+  if (gk) await checkKey(); else out.innerHTML = '';
+  if (!ck) return;
+  btn.disabled = true;
+  const model = $('#sClaudeModel').value, name = 'Claude ' + (CLAUDE_NAMES[model] || model);
+  let row, sum;
+  try {
+    await callClaude(null, { key: ck, model, useWeb: false, noSystem: true, messages: [{ role: 'user', content: 'Rispondi solo con la parola: ok' }] });
+    row = `<div class="r"><span class="ok">✓</span><span><b>${esc(name)}</b> — funziona</span></div>`;
+    settings.claudeKey = ck; settings.claudeModel = model; saveSettings();
+    sum = `Claude funziona ed è il motore principale${gk ? '; la chiave Google resta come riserva gratuita' : ''}.`;
+  } catch (e) {
+    const why = { key: 'chiave non valida', credit: 'credito esaurito', rate: 'troppe richieste in questo momento', server: 'servizio sovraccarico', net: 'nessuna connessione', model: 'modello non disponibile' }[e.code] || e.message;
+    row = `<div class="r"><span class="no">✕</span><span><b>${esc(name)}</b> — ${esc(why)}</span></div>`;
+    sum = e.code === 'credit' ? 'Il credito di Claude è finito: ricaricalo su console.anthropic.com (Billing).' : e.code === 'key' ? 'La chiave di Claude non è valida: copiala di nuovo da console.anthropic.com (tutta, senza spazi).' : 'Claude per ora non risponde: trovi i dettagli nella Diagnostica.';
+  }
+  out.insertAdjacentHTML('afterbegin', `<div class="sum">${sum}</div>${row}`);
+  $('#spendMsg').textContent = spendText();
+  fillDiag();
+  btn.disabled = false;
+}
+$('#btnCheck').addEventListener('click', checkAll);
+$('#btnDiag').addEventListener('click', e => copyText($('#diagBox').textContent, null) || (e.target.textContent = 'Copiata ✓', setTimeout(() => { e.target.textContent = 'Copia diagnostica'; }, 1600)));
+$('#btnEjTest').addEventListener('click', async () => {
+  const cfg = { ...settings, ejService: $('#sEjService').value.trim(), ejTemplate: $('#sEjTemplate').value.trim(), ejKey: $('#sEjKey').value.trim(), myEmail: $('#sMyEmail').value.trim() };
+  const msg = $('#ejMsg');
+  if (!cfg.ejService || !cfg.ejTemplate || !cfg.ejKey) { msg.textContent = 'Compila Service, Template e Public key.'; return; }
+  if (!Mail.valid(cfg.myEmail)) { msg.textContent = 'Scrivi la tua email: la prova arriva lì.'; return; }
+  msg.textContent = 'Invio della prova…';
+  try {
+    await Mail.send({ to: cfg.myEmail, subject: `Prova da ${cfg.name || 'Jarvis'}`, body: `Ciao! Se leggi questa email, ${cfg.name || 'Jarvis'} può inviare email dal tuo account.` }, cfg);
+    Object.assign(settings, { ejService: cfg.ejService, ejTemplate: cfg.ejTemplate, ejKey: cfg.ejKey, myEmail: cfg.myEmail }); saveSettings();
+    msg.textContent = `✓ Inviata a ${cfg.myEmail}: controlla la posta (anche nello spam). Impostazioni salvate.`;
+  } catch (e) { msg.textContent = 'Non inviata: ' + e.message + '.'; }
+});
+$('#sVoiceEngine').addEventListener('change', () => { $('#gVoiceBox').hidden = $('#sVoiceEngine').value !== 'google'; });
+$('#btnTestGVoice').addEventListener('click', () => {
+  if (!$('#sKey').value.trim() && !settings.key) { toast('Per la voce di Google serve la chiave Google (Riserva gratuita) qui sopra.'); return; }
+  const k = settings.key; settings.key = $('#sKey').value.trim() || k;
+  TTS.testGoogle($('#sGVoice').value);
+  settings.key = k;
+});
+function showSliders() {
+  $('#oRate').textContent = (+$('#sRate').value).toFixed(2).replace('.', ',');
+  $('#oPitch').textContent = (+$('#sPitch').value).toFixed(2).replace('.', ',');
+}
+['#sRate', '#sPitch'].forEach(id => $(id).addEventListener('input', showSliders));
+$('#btnTestVoice').addEventListener('click', () => {
+  // la prova usa velocità e tono dei cursori, anche prima di salvare
+  const r = settings.rate, p = settings.pitch;
+  settings.rate = +$('#sRate').value; settings.pitch = +$('#sPitch').value;
+  TTS.test($('#sVoice').value);
+  settings.rate = r; settings.pitch = p;
+});
+$('#btnSave').addEventListener('click', async () => {
+  const oldKey = settings.key;
+  settings.name = $('#sName').value.trim() || 'Atlas';
+  settings.key = $('#sKey').value.trim();
+  settings.claudeKey = $('#sClaudeKey').value.trim();
+  settings.voiceEngine = $('#sVoiceEngine').value; settings.gVoice = $('#sGVoice').value;
+  settings.ejService = $('#sEjService').value.trim(); settings.ejTemplate = $('#sEjTemplate').value.trim(); settings.ejKey = $('#sEjKey').value.trim(); settings.myEmail = $('#sMyEmail').value.trim();
+  settings.rate = +$('#sRate').value; settings.pitch = +$('#sPitch').value;
+  settings.claudeModel = $('#sClaudeModel').value;
+  settings.profile = $('#sProfile').value.trim();
+  settings.web = $('#sWeb').checked;
+  settings.speak = $('#sSpeak').checked;
+  settings.wake = $('#sWake').checked;
+  if (!settings.wake) keepAwake(false);
+  if ($('#sVoice').value) settings.voice = $('#sVoice').value;
+  settings.model = $('#sModel').value || '';
+  if (settings.key && (!settings.model || settings.key !== oldKey && !modelCache.length)) {
+    const m = await loadModelList();
+    if (m) settings.model = m;
+  }
+  saveSettings();
+  applyName();
+  if (!hasKey()) { $('#savedMsg').textContent = 'Salvato. Senza una chiave API l\'assistente non può rispondere.'; return; }
+  $('#savedMsg').textContent = 'Impostazioni salvate.';
+  setTimeout(() => closePanel(panels.settings), 500);
+});
+$('#btnClear').addEventListener('click', () => {
+  if (!chat.length) { $('#savedMsg').textContent = 'La conversazione è già vuota.'; return; }
+  if (!confirm('Cancellare tutta la conversazione da questo dispositivo?')) return;
+  chat = []; saveChat(); renderChat();
+  $('#savedMsg').textContent = 'Conversazione cancellata.';
+});
+function applyName() {
+  const n = settings.name || 'Atlas';
+  $('#brand').textContent = n;
+  document.title = n;
+  refreshHud();
+}
+
+/* ================= Avvio ================= */
+applyName();
+tickClock(); setInterval(tickClock, 10000);
+drawStars();
+window.addEventListener('resize', () => { clearTimeout(drawStars.t); drawStars.t = setTimeout(drawStars, 200); });
+Cloud.init();
+renderChat();
+renderCounters();
+DB.all().then(list => { docs = (list || []).sort((a, b) => a.added - b.added); renderCounters(); renderDocs(); })
+  .catch(() => toast('Questo browser non permette di salvare documenti sul dispositivo (forse sei in navigazione privata).'));
+// solo lettura, per i controlli automatici
+window.JarvisDebug = { labels: () => Cloud.labels(), pulses: () => Cloud.pulses(), tasks: () => Team.tasks() };
+if (!hasKey()) setTimeout(() => openPanel('settings'), 450);
+else setTimeout(resumeWake, 600);
+})();
+</script>
+</body>
+</html>
